@@ -1,0 +1,8 @@
+reference
+*.aux
+*.bbl
+*.blg
+*.log
+*.out
+*.pdf
+draft.tex
