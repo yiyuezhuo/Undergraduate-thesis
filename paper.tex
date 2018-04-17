@@ -199,7 +199,7 @@ $$
 
 Where $N(x \mid \mu,\sigma)$ is normal probability density function:
 $$
-N(x \mid \mu,\sigma) = \frac{1}{\sqrt{2\pi \sigma^2}} \exp(\frac{(x-\mu)^2}{2\sigma^2})
+N(x \mid \mu,\sigma) = \frac{1}{\sqrt{2\pi \sigma^2}} \exp\left(\frac{(x-\mu)^2}{2\sigma^2}\right)
 $$
 
 The classifier parameters $\mu,\sigma$ are estimated by normal moment estimation.
@@ -588,10 +588,66 @@ sampling seems too weak in this problem.
   \label{fig:SamplingTen}
 \end{figure}
 
-%\subsection{Mutiple enempy number setting}
-%Maybe removed if time is out.
-%\subsection{Enemy movement detecting}
-%Maybe removed if time is out.
+\subsection{Mutiple enemy number setting}
+
+The above estimation is based on "true" number of enemy. Let we test it's stability. 
+What happen if the given number of number of enemy is wrong? The Figure~\ref{fig:bigVb} 
+show the result, that flat prior seems well while diagonal prior may may be dominated by 
+the prior. But it depict what we want in general.
+
+\begin{figure}[h!]
+\includegraphics[width=0.99\linewidth]{big_vb.png}
+\label{fig:bigVb}
+\end{figure}
+
+\subsubsection{The density of probabity of existence of enemy estimation}
+
+The one of advantage of VB is that it make computation of probability of special region very easy.
+The probability of exist of enemy in a given region $[x,x+dx]\times[y,y+dy]$ can be given by:
+
+$$
+pe(x,y,dx,dy) = 1 - \prod_i \left(
+(1-(\Phi(x+dx - \mu^X_i)/\sigma^X_i) -  (\Phi(x - \mu^X_i)/\sigma^X_i))
+(1-(\Phi(y+dy - \mu^Y_i)/\sigma^Y_i) -  (\Phi(y - \mu^Y_i)/\sigma^Y_i))
+\right)
+$$
+
+Where $\Phi(x)$ is standard cumulative probability function:
+
+$$
+\Phi(x) = \int_{-\infty}^x \frac{1}{\sqrt{2\pi}} \exp\left(\frac{x^2}{2}\right)
+$$
+
+And $$\mu^X_i$$ is the expect parameter of normal approximated posterior probability of ith enemy.
+The three other are same.
+
+The existence density(approximated) is defined:
+
+$$
+pe(x,y) = pe(x-\epsilon,y-\epsilon,2\epsilon,2\epsilon)/(4*\epsilon^2)
+$$
+
+Where $\epsilon$ is a small number, in there $\epsilon=0.01$. 
+The two example can be seen in Figure~\ref{fig:existDensity}. 
+The comparing result can be seen in seen in Figure~\ref{fig:bigVbExist}.
+
+\begin{figure}[h!]
+\includegraphics[width=0.99\linewidth]{exist_density.png}
+\label{fig:existDensity}
+\end{figure}
+
+
+\begin{figure}[h!]
+\includegraphics[width=0.99\linewidth]{big_vb_exist_prob.png}
+\label{fig:bigVbExist}
+\end{figure}
+
+
+
+\subsection{Enemy movement detecting}
+
+Considering ally,enemy,battles have not only position, but also have timestamp. In another word,
+enemy and ally may move in the time, how do we infer the movement?
 
 \section{Conclusion}
 
