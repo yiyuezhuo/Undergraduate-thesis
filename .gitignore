@@ -5,4 +5,4 @@ reference
 *.log
 *.out
 *.pdf
-draft.tex
+draft*

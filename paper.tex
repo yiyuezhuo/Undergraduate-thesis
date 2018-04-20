@@ -1,5 +1,3 @@
-% I'm so excited to see the rubbish student and teacher in this school, thanks for your fucking living.
-% Rubbish population must be destroyed, and those evil human must be died.
 
 \documentclass{article}
 
@@ -10,6 +8,7 @@
 %\usepackage{algorithmic}
 \usepackage{algpseudocode}
 \usepackage{subcaption}
+\usepackage{booktabs}
 
 \usepackage[
   paper  = letterpaper,
@@ -41,7 +40,9 @@ Assuming a location which have samll distance to two conflict side have more pro
 how do we infer the location of enemy if we can only observe the locations of ally and battle? The latent
 variable inference problem requiere a decent front probability model and a effiecent way to run the 
 inference. In this work, a battle model is introduced and a bayes inference framework based on pytorch 
-is developed to complete the inference task.
+is developed to complete the inference task including point and movement detection and 
+exist probability estimation with different prior and various initialization value setting.
+A case study about The battle of Gettysburg is included to show the overview of the content covered by the paper.
 
 \end{abstract}
 
@@ -57,7 +58,7 @@ Unfortunately, current military decision similation program, such as "classic" w
 "serious" RTS, tend to capture more "macro" aspect and simplify the reconnaissance and 
 information modeling aspect into a unaccepted level.
 
-\begin{figure}[h!]
+\begin{figure}[h]
 \includegraphics[width=0.6\linewidth]{SmolenskR4.jpg}
 \caption{This figure show the reconnassance treatment of Smolensk' 41, 
 a classic hex wargame developed by HPS.
@@ -72,7 +73,7 @@ information), and some of them may be wrong and some of them may be released by 
 The movement of Jackson in valley campaign is a vivid example about how the fake information intentionally
 made by oppnent weak the strength of army.
 
-\begin{figure}[h!]
+\begin{figure}[h]
 \includegraphics[width=0.6\linewidth]{metz.jpg}
 \caption{The map of battle of Metz, showing oob that can't be observed in real time battlefied. }
 \label{fig:metz}
@@ -84,7 +85,9 @@ Some work were made to solve this problem
 Since they filter small part of information from replay file, they made a case that enemy can not be 
 seen in that direct way, then they proposed according probability model to rebuild real situation.
 They're good try, but not real demand for most of case. The paper we
-\footnote{Though the paper only have a writer, but "we" seems a traditional and kind pronoun for such paper} 
+\footnote{Though the paper only have a writer, 
+but "we" seems a traditional and kind pronoun for such paper. 
+In following content, both "we" and "I" will be used to represent the writer.} 
 wrote will deal the problem in a more direct way. 
 A coordinate based position and movement detecting method is present in this paper.
 
@@ -94,7 +97,7 @@ A coordinate based position and movement detecting method is present in this pap
 In forward model, a process that can give probility of number of battles and the mass in support space 
 is required. For example, given ally and ememy location setting as Figure~\ref{fig:stateNoBattle}.
 
-\begin{figure}[h!]
+\begin{figure}[h]
 \includegraphics{state_no_battle.png}
 \caption{Ally and enemy setting}
 \label{fig:stateNoBattle}
@@ -131,7 +134,7 @@ It capture something crucial but have obvious weakness such as independent hypot
 model will be adujusted mutiple times to fix this and other problems. Anyway, the probability
  can be computed and visualized as contour Figure~\ref{fig:stateNoBattleProb}.
 
-\begin{figure}[h!]
+\begin{figure}[h]
 \includegraphics{state_no_battle_prob.png}
 \caption{Battle density distribution}
 \label{fig:stateNoBattleProb}
@@ -142,7 +145,7 @@ sampling" method is used. In this example, the support of density is limited to 
 (the point on the out sideof $[-1,5] \times [0,6]$ have zero density). And $100 \times 100$ points are 
 selected to build a grid approxmation. See size-reduced version in Figure~\ref{fig:gridify}.
 
-\begin{figure}[h!]
+\begin{figure}[h]
 \includegraphics[width=0.6\linewidth]{gridify.png}
 \caption{$25 \times 25$ discrete approxmation}
 \label{fig:gridify}
@@ -154,7 +157,7 @@ to determine the position drew by this process.
 
 Repeating the process 10 times, we can get size 10 independent sample from the distribution as such Figure~\ref{fig:stateSampleBattle}.
 
-\begin{figure}[h!]
+\begin{figure}[h]
 \includegraphics[width=0.6\linewidth]{state_sample_battle.png}
 \caption{Ally,enemy,prob, and a sample of battle}
 \label{fig:stateSampleBattle}
@@ -162,7 +165,7 @@ Repeating the process 10 times, we can get size 10 independent sample from the d
 
 If the positions of enemy is hidden, then we can get a instance of problem data as Figure~\ref{fig:stateNoEnemy}.
 
-\begin{figure}[h!]
+\begin{figure}[h]
 \includegraphics[width=0.6\linewidth]{state_no_enemy.png}
 \caption{hide enemy}
 \label{fig:stateNoEnemy}
@@ -206,7 +209,7 @@ The classifier parameters $\mu,\sigma$ are estimated by normal moment estimation
 
 There's the classify probability, see Figure~\ref{fig:naivebayes}.
 
-\begin{figure}[h!]
+\begin{figure}[h]
 \includegraphics[width=0.6\linewidth]{naivebayes.png}
 \caption{naive bayes predict probability coutour map}
 \label{fig:naivebayes}
@@ -231,7 +234,7 @@ $$
 
 Set $\alpha=0.1$, the result can be seen as Figure~\ref{fig:combOne}:
 
-\begin{figure}[h!]
+\begin{figure}[h]
 \includegraphics[width=0.6\linewidth]{comb1.png}
 \caption{Combining a naive bayes classifier and a smooth distance factor}
 \label{fig:combOne}
@@ -242,13 +245,13 @@ The smooth probability seems good, but the sample result seems too diffused
 Some parameters tuning are tried but not satisfy the demand. So the smooth function family are droped 
 and uniform distribution is adopted. 
 
-\begin{figure}[h!]
+\begin{figure}[h]
 \includegraphics[width=0.6\linewidth]{comb2.png}
 \caption{Too diffused sample}
 \label{fig:combTwo}
 \end{figure}
 
-\begin{figure}[h!]
+\begin{figure}[h]
 \includegraphics[width=0.6\linewidth]{comb4.png}
 \caption{When extend the scale, unrational sample will present inevitably.}
 \label{fig:combThree}
@@ -270,7 +273,7 @@ $$
 
 Figure~\ref{fig:combFive} shows how the unrational sample point is suppressed.
 
-\begin{figure}[h!]
+\begin{figure}[h]
 \includegraphics[width=0.6\linewidth]{comb5.png}
 \caption{Forced 0 zero probability can suppress the unrational point}
 \label{fig:combFive}
@@ -286,7 +289,7 @@ $$
 Where $t$ is "tense" parameter controling the shape of sigmoid, $\theta_0,\theta_1$ are threshold for
 conflict level and distance. For $\theta_0=0.2,\theta_1=1.5,t = 10.0$, the result can be show in Figure~\ref{fig:combSix}.
 
-\begin{figure}[h!]
+\begin{figure}[h]
 \includegraphics[width=0.6\linewidth]{comb6.png}
 \caption{Selected model}
 \label{fig:combSix}
@@ -454,7 +457,7 @@ using gradient information instead of propose distribution to give next step in 
 
 The situation (see Figure~\ref{fig:expState}) will be used as inference experiment data.
 
-\begin{figure}[h!]
+\begin{figure}[h]
 \includegraphics[width=0.6\linewidth]{exp_state.png}
 \caption{Given situation}
 \label{fig:expState}
@@ -465,7 +468,7 @@ The situation (see Figure~\ref{fig:expState}) will be used as inference experime
 
 Firstly, if flat prior is used (only provide likelihood), the MAP result is Figure~\ref{fig:MAPone}.
 
-\begin{figure}[h!]
+\begin{figure}[h]
 \includegraphics[width=0.6\linewidth]{MAP1.png}
 \caption{MAP with flat prior}
 \label{fig:MAPone}
@@ -499,7 +502,7 @@ is coordinate of enemy $j$.
 
 The result of MAP on the new probability function looks better as shown in the Figure~\ref{fig:MAPtwo}.
 
-\begin{figure}[h!]
+\begin{figure}[h]
 \includegraphics[width=0.6\linewidth]{MAP2.png}
 \caption{MAP with diagonal prior}
 \label{fig:MAPtwo}
@@ -516,7 +519,7 @@ attribution of the random parameter. The VI is faster but lack exact attribution
 The two results of VI in flat prior and new diagonal prior can be seen in Figure~\ref{fig:VI}.
 The two results of sampling can be seen in Figure~\ref{fig:samping}.
 
-\begin{figure}[h!]
+\begin{figure}[h]
   \begin{subfigure}[b]{0.45\linewidth}
     \includegraphics[width=\linewidth]{VI11.png}
     \caption{VI with flat prior A}
@@ -537,7 +540,7 @@ The two results of sampling can be seen in Figure~\ref{fig:samping}.
   \label{fig:VI}
 \end{figure}
 
-\begin{figure}[h!]
+\begin{figure}[h]
   \begin{subfigure}[b]{0.45\linewidth}
     \includegraphics[width=\linewidth]{Sampling11.png}
     \caption{HMC with flat prior A}
@@ -567,7 +570,7 @@ The HMC result seems inconsisitency, implying the converge fail. Though increasi
 solution(see Figure~\ref{fig:SamplingTen}). But just like we are not content to a NP-hard solver and claim that it only need more time,
 sampling seems too weak in this problem.
 
-\begin{figure}[h!]
+\begin{figure}[h]
   \begin{subfigure}[b]{0.45\linewidth}
     \includegraphics[width=\linewidth]{Sampling31.png}
     \caption{HMC with flat prior A}
@@ -595,8 +598,9 @@ What happen if the given number of number of enemy is wrong? The Figure~\ref{fig
 show the result, that flat prior seems well while diagonal prior may may be dominated by 
 the prior. But it depict what we want in general.
 
-\begin{figure}[h!]
+\begin{figure}[h]
 \includegraphics[width=0.99\linewidth]{big_vb.png}
+\caption{Mutiple setting for approximation}
 \label{fig:bigVb}
 \end{figure}
 
@@ -631,23 +635,205 @@ Where $\epsilon$ is a small number, in there $\epsilon=0.01$.
 The two example can be seen in Figure~\ref{fig:existDensity}. 
 The comparing result can be seen in seen in Figure~\ref{fig:bigVbExist}.
 
-\begin{figure}[h!]
+\begin{figure}[h]
 \includegraphics[width=0.99\linewidth]{exist_density.png}
+\caption{Two enlarged exist density situation}
 \label{fig:existDensity}
 \end{figure}
 
 
-\begin{figure}[h!]
+\begin{figure}[h]
 \includegraphics[width=0.99\linewidth]{big_vb_exist_prob.png}
+\caption{Mutiple setting fit with exist probabiliy}
 \label{fig:bigVbExist}
 \end{figure}
 
 
 
-\subsection{Enemy movement detecting}
+\section{Extention: Enemy movement detecting}
 
 Considering ally,enemy,battles have not only position, but also have timestamp. In another word,
 enemy and ally may move in the time, how do we infer the movement?
+
+Interestingly, the model only need a little modification to integrate the setting.
+
+Assurming the time begin at $0$ and end at $1$, and enemy have uniform motion in constant speed.
+So the parameters$x^E_i$ can be rewritten as $x^E_i(t) = (1-t)x^E_i(0) + tx^E_i(1)$, 
+$x^E_i(0),x^E_i(1)$ means the position of ith enemy in time 0 and 1 respectively, and so on.
+They are new parameters. The other structual probability function almost keep its original form.
+
+First, assurming $x^E_i(0),y^E_i(0)$ are known and $x^E_i(1),y^E_i(1)$ are unknown.
+A instance of inference shown in Figure~\ref{fig:bkeu}. Where arrowtail indicate the known begin point.
+The one of two arrowhead surrounded by sd ellipse is estimated $t=1$ coordination expectation. 
+The another is "true" point.
+
+\begin{figure}[h]
+\includegraphics[width=0.4\linewidth]{bkeu.png}
+\caption{The $t=0$ situation known but $t=1$ not}
+\label{fig:bkeu}
+\end{figure}
+
+The following Figure~\ref{fig:bueu} show the situation in which $t=0,1$ situation are both unknown
+\footnote{Note they're not in same data set.}. Where the arrowtail of first arrow is "true" begin
+point, the middile point is estimated posterior expect of the point at $t=0$, the arrowhead of second arrow
+is estimated posterior expect of the point at $t=1$.
+
+\begin{figure}[h]
+\includegraphics[width=0.6\linewidth]{bueu.png}
+\caption{Both $t=0$ situation and $t=1$ are unknown}
+\label{fig:bueu}
+\end{figure}
+
+The prior that give punishment to too long moving range also are useful and easy to implement. 
+But the dataset that can highlight the advantage don't be constructed yet subject to time limit.
+So it will be skiped.
+
+\section{Extention: Dealing complex position distribution.}
+
+The above content is based on similar distribution, a curve can divide ally and enemy easily.
+What will happen if the shape become complex and hard to capture for "one center" bayes naive classifer?
+
+\subsection{Circle}
+
+The "true" position is droped. This section will contain only "initialization value"
+(In above content, "true position" play also initialization value role.). 
+The Figure~\ref{fig:circleIteration} show the circle setting with flat prior, 
+showing also a nice iteration convege process .
+
+
+\begin{figure}[h]
+\includegraphics[width=0.99\linewidth]{circle_iteration.png}
+\caption{Iteration process for circle setting with flat prior and random initialization}
+\label{fig:circleIteration}
+\end{figure}
+
+\subsection{Case study: The battle of Gettysburg}
+
+Now, it's the time to abandon the globular chicken in vacuum loved by physicists.
+The Figure~\ref{fig:gettysburg} show the map and data of the battle of Gettysburg in second day.
+The data only capture the division(NATO:XX)  in the map.
+The confederate have less number of division since the size of the division of CSA are more big.
+The data is from HPS great wargame "Civil war:Gettysburg". 
+The data used listed in the Table~\ref{tab:Confederate} and \ref{tab:Union}, in which strength 
+is number of unit that is not used in the model yet and will be used in later section as weight.
+
+\begin{table}
+\parbox{.45\linewidth}{
+\begin{tabular}{lrrr}
+\toprule
+{} &  strength &    x &    y \\
+\midrule
+Heth's Div     &      4628 &  2.4 &  4.8 \\
+McLaws' Div    &      6762 &  2.9 &  1.0 \\
+Hood's Div     &      6957 &  3.3 &  0.1 \\
+Anderson's Div &      6686 &  3.5 &  2.8 \\
+Pender's Div   &      5080 &  3.6 &  3.7 \\
+Rodes' Div     &      5202 &  5.0 &  4.2 \\
+Early's Div    &      4572 &  6.0 &  3.9 \\
+Johnson's Div  &      6012 &  7.2 &  4.5 \\
+\bottomrule
+\end{tabular}
+\caption{Confederate oob}
+\label{tab:Confederate}
+}
+\hfill
+\parbox{.45\linewidth}{
+\begin{tabular}{lrrr}
+\toprule
+{} &  strength &    x &    y \\
+\midrule
+2nd D (Humphreys)   &      4913 &  4.2 &  1.7 \\
+1st Div (Birney)    &      5008 &  4.5 &  0.8 \\
+2nd Div (Gibbon)    &      3558 &  5.1 &  2.3 \\
+3rd Div (Hays)      &      3622 &  5.2 &  2.6 \\
+1st Div (Caldwell)  &      3303 &  5.2 &  1.8 \\
+3rd Div (Schurz)    &      1633 &  5.3 &  3.1 \\
+2nd Div (Steinwehr) &      2264 &  5.4 &  2.9 \\
+3rd Div (Doubleday) &      2922 &  5.4 &  2.7 \\
+1st Div (Barlow)    &      1475 &  5.5 &  3.1 \\
+2nd Div (Robinson)  &      1311 &  5.5 &  2.6 \\
+1st Div (Wadsworth) &      1697 &  6.2 &  3.0 \\
+2nd Div (Geary)     &      3851 &  6.2 &  2.8 \\
+1st Div (Williams)  &      4698 &  6.3 &  2.1 \\
+2nd Div (Ayres)     &      3990 &  6.6 &  1.6 \\
+1st Div (Barnes)    &      3411 &  6.7 &  1.7 \\
+3rd Div (Crawford)  &      2842 &  6.8 &  1.6 \\
+3rd Div (Newton)    &      4729 &  7.3 &  0.8 \\
+1st Div (Wright)    &      4181 &  7.4 &  1.2 \\
+2nd Div (Howe)      &      3548 &  9.3 &  0.0 \\
+\bottomrule
+\end{tabular}
+\caption{Union oob}
+\label{tab:Union}
+}
+\end{table}
+
+Following we assurm the position of army of Union and battle are known but CSA not.
+
+\begin{figure}[h]
+  \begin{subfigure}[b]{0.49\linewidth}
+    \includegraphics[width=\linewidth]{gettysburg-map.png}
+    \caption{Map of battle of Gettysburg, second day}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.49\linewidth}
+    \includegraphics[width=\linewidth]{gettysburg-model.png}
+    \caption{Simple model for the situation}
+  \end{subfigure}
+  \caption{Comparing between real and model setting}
+  \label{fig:gettysburg}
+\end{figure}
+
+In Figure~\ref{fig:gettysburgTwo} the forward probability model is illustrated and a sample of the model and observed
+ally unit.
+
+\begin{figure}[h]
+  \begin{subfigure}[b]{0.49\linewidth}
+    \includegraphics[width=\linewidth]{gettysburg-forward.png}
+    \caption{Unnormalized probability of battle occuring}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.49\linewidth}
+    \includegraphics[width=\linewidth]{gettysburg-sample.png}
+    \caption{A sample of occuring battle and ally unit.}
+  \end{subfigure}
+  \caption{The forward model and a sample of it}
+  \label{fig:gettysburgTwo}
+\end{figure}
+
+We can run procedure described above with randomized initialized point. 
+Figure~\ref{fig:gettysburgInit} show the exist-probability and converge process.
+
+\begin{figure}[h]
+\includegraphics[width=0.99\linewidth]{gettysburg-init.png}
+\caption{Iteration process for randomized initialized setting with flat prior in Gettysburg sample}
+\label{fig:gettysburgInit}
+\end{figure}
+
+It looks good, thougn the enemy units seems too close to ally. It can be solved a bit by prior.
+
+
+\section{Extention: Size effect}
+
+The above content assurm battles and units are homogeneous. It may make sense,
+but if battle and unit can include number and size information, the result will be more useful.
+
+To extend our model to embrace the change, we can merely define the high weight the unit have,
+the long radius in distance factor and large weight in estimation on center of class unit cause.
+
+Following content use the strength of Table~\ref{tab:Confederate} and \ref{tab:Union} as weight.
+The $\mu,\sigma$ used by naive bayes classifer is computed by weithted version now.
+And the distance will be adujusted to $dist_{ij} = dist_{ij} \frac{\beta}{stre_i}$, the $\beta$
+is seted to $6000$. So all of units of Union will be penalized, 
+and a few of Confederate will be bonused for distance factor.
+
+The Figure~\ref{fig:gettysburgInitTwo} show the result, it very like the result fited without size effect. 
+It turn out that the model is steady for suct effect.
+
+\begin{figure}[h]
+\includegraphics[width=0.99\linewidth]{gettysburg-init2.png}
+\caption{Iteration process for randomized initialized setting with flat prior with Size effect}
+\label{fig:gettysburgInitTwo}
+\end{figure}
+
 
 \section{Conclusion}
 
@@ -658,6 +844,13 @@ the writer Yueyi Zhuo}
 in a classes of prolbem in which 
 two class of point(ally and enemy) will generate another class of points(battle), 
 when one class is hidden(enemy).
+
+The forward model can transformed easily to backward model to do inference due to our framework.
+The inference include point detection, movement dectection with prior or adujusted prior.
+They're be checked its steady and converge performance by true initialization and random initialization.
+A case study about battle of Gettysburg summary the content covered by the paper. 
+I wish the result can be producation environment and my game designing.
+
 Designing the forward model, doing its inference and balancing effciency and correctness 
 are interesting challenge, but useful.
 
