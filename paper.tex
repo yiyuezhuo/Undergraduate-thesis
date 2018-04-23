@@ -10,6 +10,7 @@
 \usepackage{subcaption}
 \usepackage{booktabs}
 
+
 \usepackage[
   paper  = letterpaper,
   left   = 1.25in,
@@ -19,6 +20,51 @@
   ]{geometry}
 \usepackage{setspace}
 
+% For importing python source code, from https://tex.stackexchange.com/questions/83882/how-to-highlight-python-syntax-in-latex-listings-lstinputlistings-command
+
+\usepackage{color}
+\definecolor{deepblue}{rgb}{0,0,0.5}
+\definecolor{deepred}{rgb}{0.6,0,0}
+\definecolor{deepgreen}{rgb}{0,0.5,0}
+
+% Default fixed font does not support bold face
+\DeclareFixedFont{\ttb}{T1}{txtt}{bx}{n}{12} % for bold
+\DeclareFixedFont{\ttm}{T1}{txtt}{m}{n}{12}  % for normal
+\DeclareFixedFont{\ttfuck}{T1}{txtt}{m}{n}{12}  % for normal
+
+
+\usepackage{listings}
+
+% Python style for highlighting
+\newcommand\pythonstyle{\lstset{
+language=Python,
+basicstyle=\ttm,
+otherkeywords={self},             % Add keywords here
+keywordstyle=\ttb\color{deepblue},
+emph={MyClass,__init__},          % Custom highlighting
+emphstyle=\ttb\color{deepred},    % Custom highlighting style
+stringstyle=\color{deepgreen},
+frame=tb,                         % Any extra options here
+showstringspaces=false,             
+breaklines=true,                 % come from https://tex.stackexchange.com/questions/243500/python-code-block-outside-of-margin
+}}
+
+
+% Python environment
+\lstnewenvironment{python}[1][]
+{
+\pythonstyle
+\lstset{#1}
+}
+{}
+
+% Python for external files
+\newcommand\pythonexternal[2][]{{
+\pythonstyle
+\lstinputlisting[#1]{#2}}}
+
+% Python for inline
+\newcommand\pythoninline[1]{{\pythonstyle\lstinline!#1!}}
 
 
 
@@ -26,7 +72,9 @@
 
 \title{Hidden enemy detecting using bayes inference}
 
-\author{yueyi zhuo(2014060843)}
+\author{yueyi zhuo(2014060843) 
+\footnote{The LaTeX source code and experiment files is hosted on GitHub, see: 
+\url{https://github.com/yiyuezhuo/Undergraduate-thesis}}}
 
 \date{2018}
 
@@ -36,26 +84,31 @@
 
 \begin{abstract}
 
-Assuming a location which have samll distance to two conflict side have more probability cause a battle,
-how do we infer the location of enemy if we can only observe the locations of ally and battle? The latent
-variable inference problem requiere a decent front probability model and a effiecent way to run the 
+Assuming a location which have samller distance to two conflict factions have higher probability causing a battle,
+how do we infer the location of enemy if we can only observe the locations of allies and battles? 
+The latent variable inference problem requieres a suitable front probability model and a effiecent way to run the 
 inference. In this work, a battle model is introduced and a bayes inference framework based on pytorch 
-is developed to complete the inference task including point and movement detection and 
+is developed to reach the inference task including point, movement detection and 
 exist probability estimation with different prior and various initialization value setting.
 A case study about The battle of Gettysburg is included to show the overview of the content covered by the paper.
 
 \end{abstract}
 
+\tableofcontents
+
+
+
 \section{Introduction}
 
-In real warfare, you can't observe enemy units even ally unit as RTS or classic board wargame way.
-The only thing you can rely are complex and confusing even self-contradiction information and misinformation.
+In real warfare, you can't observe enemy units even allies units as RTS or classic board wargame way.
+The only thing you can rely on are complex and confusing even self-contradiction information and misinformation.
 There're a lot of example, that general misunderstand information and may be defeated due to this. 
 Bing Sun manipulated field kitchen of his army to trick his opponent, General McClellan reject to attack
-due to "peace gun"(fake gun instrument) seted by south rebel, lossing oppotunity to beat rebel down.
+due to "peace gun"(fake gun instrument) seted by south rebels, lossing oppotunity to beat rebel down.
 
-Unfortunately, current military decision similation program, such as "classic" wargame Figure~\ref{fig:hps} and somewhat 
-"serious" RTS, tend to capture more "macro" aspect and simplify the reconnaissance and 
+Unfortunately, current military decision similation program, 
+such as "classic" wargame (a example see Figure~\ref{fig:hps}) and somewhat  "serious" RTS, 
+tend to capture more "macro" aspect and simplify the reconnaissance and 
 information modeling aspect into a unaccepted level.
 
 \begin{figure}[h]
@@ -66,12 +119,13 @@ Units can only be observed wholly or can't be observed. }
 \label{fig:hps}
 \end{figure}
 
-Though we can read the oob(order of battle) as Figure~\ref{fig:metz} from map of battle, but it's obvious that those marks are 
-placed in there using post Liang Zhuge information. In real time battle field, you can only hear where
-be attacked and where observe the trace of enemy (instead of unit detail id or somewhat strange quatity
-information), and some of them may be wrong and some of them may be released by enemy to confuse you.
+Though we can read the oob(order of battle) as Figure~\ref{fig:metz} from map of battle, 
+but it's obvious that those marks are placed in there using post Liang Zhuge information. 
+In real time battle field, you can only hear where be attacked and where observe the trace of enemy 
+(instead of unit detail id or somewhat weird strange quatity information), 
+and some of them may be wrong and some of them may be released by enemy to confuse you.
 The movement of Jackson in valley campaign is a vivid example about how the fake information intentionally
-made by oppnent weak the strength of army.
+made by oppnent get the change to weaken the strength of army.
 
 \begin{figure}[h]
 \includegraphics[width=0.6\linewidth]{metz.jpg}
@@ -80,15 +134,15 @@ made by oppnent weak the strength of army.
 \end{figure}
 
 
-Some work were made to solve this problem 
+There are some work were made to solve this problem 
 \cite{hostetler2012inferring} \cite{vsmejkal2016integrating} \cite{touhou}.
 Since they filter small part of information from replay file, they made a case that enemy can not be 
 seen in that direct way, then they proposed according probability model to rebuild real situation.
-They're good try, but not real demand for most of case. The paper we
+Those're good tries, but not real demands for most of case. The paper we
 \footnote{Though the paper only have a writer, 
 but "we" seems a traditional and kind pronoun for such paper. 
 In following content, both "we" and "I" will be used to represent the writer.} 
-wrote will deal the problem in a more direct way. 
+wrote will deal the problem in a more direct and intuitive way. 
 A coordinate based position and movement detecting method is present in this paper.
 
 \section{Building a proper forward model}
@@ -105,8 +159,10 @@ is required. For example, given ally and ememy location setting as Figure~\ref{f
 
 \subsection{A basic setting}
 
-Suppose the the number of battle is 10, we can model the 10 battles are indepently drawn from below 
-distribution:
+Suppose the the number of battle is $10$ 
+\footnote{ Though the number can modeled as it draw from a given distribution by adding 
+stochastic process, it be not adpoted due to its extra difficulty in express.}
+, we can model the $10$ battles are indepently drawn from below distribution:
 
 $$
 P(x,y) \propto \max_i p^A_{i}(x,y) \max_j p^E_{j} (x,y)
@@ -119,20 +175,20 @@ $$
 P^S_i(x,y) \propto \exp(-\frac{1}{2}((x-x^S_i)^2 + (y-y^S_i)^2))
 $$
 
-Where the probability in $(x,y)$ released from i'th unit of S side(enemy or ally). 
-So we can rewrite above formula as: 
+Where the probability in $(x,y)$ released from i'th unit of S side($S \in \{A,E \}$). 
+So the above formula can be rewritten as: 
 
 $$
 P(x,y) \propto \exp(-\frac{1}{2}((x-x_{nearst(x,y)})^2 + (y-y_{nearst(x,y)})^2))
 $$
 
-Where $nearst(x,y)$ indicate the the unit(enemy or ally) which is nearest to (x,y).
+Where $nearst(x,y)$ point to the unit(enemy or ally) which is nearest to (x,y).
 
-This means the non-normalized probability is only subject to the nearest two conflict units’s distance, 
-though the assumption don’t have abundant meaning. 
-It capture something crucial but have obvious weakness such as independent hypothesis, lately the 
-model will be adujusted mutiple times to fix this and other problems. Anyway, the probability
- can be computed and visualized as contour Figure~\ref{fig:stateNoBattleProb}.
+This means the non-normalized probability is only subject to the nearest two conflict units’s distance. 
+Though the assumption don’t have abundant meaning,
+it capture something crucial but have obvious weakness such as independent hypothesis, 
+lately the model will be adujusted mutiple times to resolve this and other problems. 
+Anyway, the probability can be computed and visualized as contour Figure~\ref{fig:stateNoBattleProb}.
 
 \begin{figure}[h]
 \includegraphics{state_no_battle_prob.png}
@@ -140,10 +196,12 @@ model will be adujusted mutiple times to fix this and other problems. Anyway, th
 \label{fig:stateNoBattleProb}
 \end{figure}
 
-The probability don't have a standard shape, implying it's hard to sample. To overcome this, the "grid 
-sampling" method is used. In this example, the support of density is limited to $[-1,5] \times [0,6]$
-(the point on the out sideof $[-1,5] \times [0,6]$ have zero density). And $100 \times 100$ points are 
-selected to build a grid approxmation. See size-reduced version in Figure~\ref{fig:gridify}.
+The probability distribution don't have a standard shape, implying it's hard to sample. 
+To overcome this, the "grid sampling" technology is used. In this example,
+ the support of density is limited to $[-1,5] \times [0,6]$
+(that is, the point out of set $[-1,5] \times [0,6]$ have zero density). 
+And $100 \times 100$ points are selected to build a grid approxmation. 
+See a size-reduced example serve to eye in Figure~\ref{fig:gridify}.
 
 \begin{figure}[h]
 \includegraphics[width=0.6\linewidth]{gridify.png}
@@ -155,7 +213,8 @@ So firstly we draw a square in the grid according to the approximated probabilit
 and then draw two uniform variable $dX \sim U(0,5-(-1)/100),dY \sim U(0,(6-0)/100)$ 
 to determine the position drew by this process.
 
-Repeating the process 10 times, we can get size 10 independent sample from the distribution as such Figure~\ref{fig:stateSampleBattle}.
+Repeating the process 10 times, 
+we can get size 10 independent sample from the distribution as such Figure~\ref{fig:stateSampleBattle}.
 
 \begin{figure}[h]
 \includegraphics[width=0.6\linewidth]{state_sample_battle.png}
@@ -163,7 +222,8 @@ Repeating the process 10 times, we can get size 10 independent sample from the d
 \label{fig:stateSampleBattle}
 \end{figure}
 
-If the positions of enemy is hidden, then we can get a instance of problem data as Figure~\ref{fig:stateNoEnemy}.
+If the positions of enemy is hidden, 
+then we can get a instance of problem data as Figure~\ref{fig:stateNoEnemy}.
 
 \begin{figure}[h]
 \includegraphics[width=0.6\linewidth]{state_no_enemy.png}
@@ -173,30 +233,32 @@ If the positions of enemy is hidden, then we can get a instance of problem data 
 
 \subsection{A complex setting}
 
-Although the distribution may satisfy our goal, but the $\min$ function will cause that gradient-based optmization
-method doesn't work in those units whose is not nearest to observed battle. So we proposed another setting:
+Although the distribution may satisfy our goal, 
+but the $\min$ function will make that gradient-based optmization method difficult to effect 
+in those units whose is not nearest to observed battle. 
+So a another specification is proposed below to get it done:
 
-First, a classifier is used to determine the "conflict level" in every point.
+First, a differentiable classifier is used to determine the "conflict level" in every point.
 Supposing a point is more likely be controled by S side 
 if a unit of S side have shortest distance to it, then we can define that the more two control probability 
 being close to eachother, the more conflict chance in this point. So the conflict factor is defined by:
 
 $$
-P_{\text{conflict}}(x,y) = P_\text{ally}(x,y) P_\text{enemy}(x,y)
+P_{\text{conflict}}(x,y) = P_\text{ally}(x,y) P_\text{enemy}(x,y) = P_\text{ally}(x,y)(1-P_\text{ally}(x,y))
 $$
 
-Where $P_\text{ally}(x,y)$ indicate the probability(belief) of $(x,y)$ is classified 
-in ally given by classifer.
+Where $P_\text{ally}(x,y)$ indicate the probability(belief) of $(x,y)$ being classified 
+into ally set given by classifer.
 
-In this paper, we use naive bayes classifer as classifer since it helps gradient computation. The 
-classify probability are given by:
+In this paper, we use naive bayes classifer as classifer since it helps gradient computation. 
+The classification probability are given by:
 
 $$
 P_\text{ally}(x,y) = \frac{
-N(x\mid \mu_\text{ally} ,\sigma_\text{ally}) N(y  \mid \mu_\text{ally}, \sigma_\text{ally})
+N(x\mid \mu^A_X ,\sigma^A_X) N(y \mid \mu^A_Y, \sigma^A_Y)
 }{
-N(x \mid \mu_\text{ally} , \sigma_\text{ally}) N(y \mid \mu_\text{ally} , \sigma_\text{ally}) + 
-N(x \mid \mu_\text{enemy} , \sigma_\text{enemy}) N(y \mid \mu_\text{enemy} , \sigma_\text{enemy})
+N(x \mid \mu^A_X , \sigma^A_X) N(y \mid \mu^A_Y , \sigma^A_Y) + 
+N(x \mid \mu^E_X , \sigma^E_X N(y \mid \mu^E_Y , \sigma^E_Y)
 }
 $$
 
@@ -205,9 +267,16 @@ $$
 N(x \mid \mu,\sigma) = \frac{1}{\sqrt{2\pi \sigma^2}} \exp\left(\frac{(x-\mu)^2}{2\sigma^2}\right)
 $$
 
-The classifier parameters $\mu,\sigma$ are estimated by normal moment estimation.
+The classifier parameters $\mu,\sigma$ are estimated by normal moment estimation. 
 
-There's the classify probability, see Figure~\ref{fig:naivebayes}.
+\begin{align*}
+\mu_Z^S    &= 1/N^S \sum_{i=1}^N Z_i^S \\
+\sigma_Z^S &= 1/N^S (Z_i^S - \mu_Z^S)^2
+\end{align*}
+
+Where $Z \in \{ X,Y \}$ and $S \in \{ A,E \}$. $N_S$ is number of units of side $S$.
+
+A living example of classify probability can be seen in Figure~\ref{fig:naivebayes}.
 
 \begin{figure}[h]
 \includegraphics[width=0.6\linewidth]{naivebayes.png}
@@ -222,7 +291,7 @@ $$
 P_{\text{distance}}(x,y) = \exp(-\alpha \min_{u} distance)
 $$
 
-Where $u$ means unit. $\min_u distance$ the shortest distance in all possible distance 
+Where $u$ means any unit. $\min_u distance$ the shortest distance in all possible distance 
 between coordinate of unit and $(x,y)$.
 
 So the probability is:
@@ -232,7 +301,7 @@ P(x,y) = P_{\text{conflict}}(x,y) P_{\text{distance}}(x,y) =
 P_\text{ally}(x,y) P_\text{enemy}(x,y) \exp(-\alpha \min_{u} distance)
 $$
 
-Set $\alpha=0.1$, the result can be seen as Figure~\ref{fig:combOne}:
+Set $\alpha=0.1$, the 2d function can be seen in Figure~\ref{fig:combOne}:
 
 \begin{figure}[h]
 \includegraphics[width=0.6\linewidth]{comb1.png}
@@ -240,10 +309,11 @@ Set $\alpha=0.1$, the result can be seen as Figure~\ref{fig:combOne}:
 \label{fig:combOne}
 \end{figure}
 
-The smooth probability seems good, but the sample result seems too diffused 
-(Figure~\ref{fig:combTwo}) and when scale is enlarged, the problem even worsen (\ref{fig:combThree}).
-Some parameters tuning are tried but not satisfy the demand. So the smooth function family are droped 
-and uniform distribution is adopted. 
+The smooth probability seems good, but the sampled result seems too diffused 
+(see Figure~\ref{fig:combTwo}) and if scale is enlarged, 
+the problem even worsen (see Figure~\ref{fig:combThree}).
+Some parameters tuning are tried but not satisfy the demand. 
+So the smooth function family are removed and uniform distribution is employed. 
 
 \begin{figure}[h]
 \includegraphics[width=0.6\linewidth]{comb2.png}
@@ -257,10 +327,10 @@ and uniform distribution is adopted.
 \label{fig:combThree}
 \end{figure}
 
-\subsection{Selected setting}
+\subsection{Empolyed setting}
 
-We assign a point constant probability if it is greater than conflict threshold and less than distance 
-threshold:
+We assign a point constant probability 
+if it is greater than conflict threshold and less than distance threshold:
 
 $$
 P(x,y) \propto
@@ -271,7 +341,7 @@ P(x,y) \propto
 \end{cases}
 $$
 
-Figure~\ref{fig:combFive} shows how the unrational sample point is suppressed.
+Figure~\ref{fig:combFive} shows how the unrational sample point is suppressed by the way.
 
 \begin{figure}[h]
 \includegraphics[width=0.6\linewidth]{comb5.png}
@@ -279,11 +349,13 @@ Figure~\ref{fig:combFive} shows how the unrational sample point is suppressed.
 \label{fig:combFive}
 \end{figure}
 
-To get gradient information to proceed optimization, rewrite the conditional jump function to "soft"
-version, for example, sigmoid function $sig(x) = \frac{1}{1+\exp(-x)}$:
+To get gradient information to proceed optimization, 
+rewrite the conditional jump function to "soft" version, 
+just like relation of ReLu and softplus in machine learning. 
+For example, sigmmoid function $sigm(x) = \frac{1}{1+\exp(-x)}$:
 
 $$
-P(x,y) \propto sig(t (P_\text{ally}(x,y) (1-P_\text{ally}(x,y)) - \theta_0)) sig(t(-\min_{u} distance + \theta_1))
+P(x,y) \propto sigm(t (P_\text{ally}(x,y) (1-P_\text{ally}(x,y)) - \theta_0)) sigm(t(-\min_{u} distance + \theta_1))
 $$
 
 Where $t$ is "tense" parameter controling the shape of sigmoid, $\theta_0,\theta_1$ are threshold for
@@ -295,7 +367,7 @@ conflict level and distance. For $\theta_0=0.2,\theta_1=1.5,t = 10.0$, the resul
 \label{fig:combSix}
 \end{figure}
 
-The model seems perfect to our demand, following article will use it.
+The model seems perfect to our demand, following article will use it as baseline model.
 
 \section{A framework and algorithms for inference}
 
@@ -310,9 +382,10 @@ The core of them are a automated gradient computation library,
 they're stan-math, theano, tensorflow respectively. 
 
 Nevertheless, those except stan are too weak in their ability describing complex probabiliy function.
-And the compile time of stan is too long. So a light-weight bayes inference library is proposed to 
-fulfill our goal. The framework is based on pytorch providing a flexible automated gradient computation lib and easy-to-use 
-dynamic computation graph as Chainer.
+And the compile time of stan is too long. 
+So a light-weight bayes inference library is proposed to fulfill our goal. 
+The framework is based on pytorch providing a flexible automated gradient computation lib and 
+easy-to-use dynamic computation graph like Chainer.
 
 \subsection{Inference method and algorithm introduction}
 
@@ -329,7 +402,7 @@ descent (take $loss = -likelihood \times prior$) process. See Algorithm~\ref{alg
 \begin{algorithm}
 \caption{Stochastic gradient descent}
 \begin{algorithmic}[1]
-\Procedure{SGD}{$\theta,lr,step$}
+\Procedure{SGD}{$\theta,lr,step$} \Comment{$\theta$ is init value, $lr$ is learning rate,$step$ is number of iterating}
     \For{i in 1:step}
         \State $\nabla \gets (\nabla_\theta \log(x,\theta)|_{\theta})$
         \State $\theta \gets \theta - lr \nabla -\theta$
@@ -351,17 +424,17 @@ $$
 
 Where $p(\theta \mid x)$ is exact posterior distribution. 
 $q(\theta)$ is corresponding variational distribution approximating the exact one.
-The family of $q(\theta)$ are usually employed as normal distribution, especially $N(\mu,\mathbf{\Sigma})$ form.
-If $\mathbf{\Sigma}=\mathrm{diag}(exp(\mathbf{\omega}))$, 
+The family of $q(\theta)$ are usually employed as normal distribution, especially $N(\mu,\mathbf{\sigma})$ form.
+If $\mathbf{\sigma}=\mathrm{diag}(exp(\mathbf{\omega}))$, 
 that is so called meanfield setting we will see it in following content.
 %$q(\theta \mid \mu,\omega)$ is corresponding variational distribution approximating the exact one
 %and the $\mu,\omega=\log(\sigma)$ means the distribution is in normal family with independent variable(meanfield).
 %The $\mu,\omega$ will be omited in following content.
 
-Since it employ variational distribution $q(\theta)$ as expectation weight 
+Since it employ variational(approximated) distribution $q(\theta)$ as expectation weight 
 instead of exact posterior distribution,
-the computation difficulty is relative reduced. But it seems too hard to deal too. So 
-we turn to considering evidence lower bound(ELBO) which is lower bound for $\log p(x)$:
+the computation difficulty is relative reduced. But it seems too hard to deal too. 
+So we turn to considering evidence lower bound(ELBO) which is lower bound for $\log p(x)$:
 
 \begin{align*}
 \log p(x) &= \log \int_\theta p(x,\theta) = \log \int_\theta p(x,\theta) \frac{q(\theta)}{q(\theta)} = \log \left( E_q \frac{p(x,\theta)}{q(\theta)} \right)  \\
@@ -382,13 +455,12 @@ So we can maximizing ELBO to minimizing KL diversity.
 To do the optimization, the tradition variational inference method, 
 Coordinate ascent variational inference (CAVI) algorithm,
 require a analytic conditional expectation $E_{-j}(\log p(\theta_j \mid \mathbf{\theta}_{-j},\mathbf{x}))$. 
-It's annoy when user aware that he can do sampling to
-reach same goal without any of such brain exhausted requirment. 
+It's annoy when lazy statistician aware that he can do sampling to
+reach same goal without any of such brain exhausted brain challenges. 
 
 The Automatic differentiation variational inference (ADVI) is presented by 
-\cite{kucukelbir2017automatic} and \cite{kucukelbir2014fully}
-to fix it. The core of the algorithm is to use random integral to approximate a hard-to-deal expectation.
-
+\cite{kucukelbir2017automatic} and \cite{kucukelbir2014fully} to fix it. 
+The core of the algorithm is to use random integral to approximate a hard-to-deal expectation.
 
 Algorithm~\ref{alg:advi} is a simplified version from \cite{kucukelbir2017automatic}, benefited that we don't need transform
 the support of restricted variable to unconstrained space.
@@ -396,10 +468,10 @@ the support of restricted variable to unconstrained space.
 \begin{algorithm}
 \caption{Automatic differentiation variational inference(meanfield without transform)}
 \begin{algorithmic}[1]
-\Procedure{ADVI}{$\mathbf{\mu},\mathbf{\omega},lr,M,step$}
+\Procedure{ADVI}{$\mathbf{\mu},\mathbf{\omega},lr,M,step$}  \Comment{$\mathbf{\omega}$ is init value, M is size of sample to monte carlo integral}
     \For{$s$ in $1:step$}
         \State $\hat{\nabla} \gets \mathbf{0}$
-        \State $\mathbf{\eta} \sim N(\mathbf{0},\mathbf{I}) $
+        \State $\mathbf{\eta} \sim N(\mathbf{0},\mathbf{I}) $ \Comment{Draw a sample from standard normal distribution}
         \For{$i$ in $1:M$} 
             \State $\hat{\theta} \gets (\mathbf{\eta}_i \exp(\mathbf{\omega}_i)) + \mathbf{\mu}_i$
             \State $\hat{\nabla} \gets \hat{\nabla} + (\nabla_\theta \log p(x,\theta)|_{\hat{\theta}})$
@@ -416,25 +488,39 @@ the support of restricted variable to unconstrained space.
 \label{alg:advi}
 \end{algorithm}
 
+The ADVI use noised gradient to find posterior expect that is equal to MAP(with more low effiecency),
+ and collect gradient shock and concussion to estimate posterior variance.
+ 
+In this paper, meanfield normal approximation is employed. That is:
+
+$$
+p(x^E_1,\dots,x^E_{N_E},y^E_1,\dots,y^E_{N_E}) \sim 
+N((\mu_{X^E_1},\dots,\mu_{y^E_{N_E})^T},\mathrm{diag}(\sigma_{X^E_1},\dots,\sigma_{y^E_{N_E}}))
+$$
+
+Where $p(x^E_i) \sim N(\mu_{x^E_i},\sigma_{x^E_i}^2)$. 
+Such $\mu_{x^E_i},\sigma_{x^E_i}^2)$ are called variational(approximated) parameters. 
+it's called meanfield since the covariace matrix is a diagonal matrix, 
+excluding all of correlation between randomized parameters.
 
 \subsubsection{Sampling}
 
 Variational inference is only a approximating method, 
-sampling from posterior distribution directly is exact but resource cost method. 
-Classic Hasting-Metropolis method rely on a propose distribution manually specified by user
+sampling from posterior distribution directly is exact but resource expensive method. 
+Classic Hasting-Metropolis method rely on a proposed distribution manually specified by statistician
 and suffer bad converge effciency. 
 The Hamiltonian Monte Carlo \cite{hoffman2014no} (See Algorithm~\ref{alg:hmc}) can be employed to improve the effciency,
-using gradient information instead of propose distribution to give next step in random walking. .
+using gradient information instead of proposed distribution to give next step in random walking. .
 
 \begin{algorithm}
 \caption{Mamitonian Monte Carlo}
 \begin{algorithmic}[1]
-\Procedure{HMC}{$\theta_0,\epsilon,L,P,step$}
+\Procedure{HMC}{$\theta_0,\epsilon,L,step$} \Comment{$L$ and $\epsilon$ are leap-frog parameters}
     \For{$i$ in $1:step$}
         \State $r_0 \sim N(0,I)$
         \State $\theta_i \gets \tilde{\theta} \gets \theta_{i-1}$
         \State $\tilde{r} \gets r_0$
-        \For{$l$ in $1:L$}
+        \For{$l$ in $1:L$} \Comment{leap-frog process}
             \State $\tilde{r} \gets \tilde{r} + (\epsilon/2) \nabla_\theta P(X,\theta)|_{\tilde{\theta}}$
             \State $\tilde{\theta} \gets \tilde{\theta} + \epsilon \tilde{r}$
             \State $\tilde{r} \gets \tilde{r} + (\epsilon/2) \nabla_\theta P(X,\theta)|_{\tilde{\theta}}$
@@ -451,7 +537,13 @@ using gradient information instead of propose distribution to give next step in 
 \label{alg:hmc}
 \end{algorithm}
 
-\section{Inference experiment}
+HMC follow the same way as ADVI using gradient pulse and bounce.
+
+HMC and other sampling method return a "trace" sample that can be used 
+to build empirical posterior distribution. In this paper, the trace almost always been see as
+parameters of normal distribution to compare to VB(ADVI) thougn it drop the main advantage of sampling method.
+
+\section{Inference experiments}
 
 \subsection{Enemy position detecting}
 
@@ -482,7 +574,7 @@ prefer the probability meaning offered by bayes.}:
 
 
 $$
-P_{\text{enemy}}(x,y) = \exp(sig(t((x+y) - \alpha)))
+P_{\text{enemy}}(x,y) = \exp(sigm(t((x+y) - \alpha)))
 $$
 
 Where $t$ is tense parameter for enemy position,
@@ -492,9 +584,9 @@ for illustration below.
 The new joint probability with the diagonal prior is:
 
 \begin{align*}
-\log p(\mathbf{x}^E,\mathbf{y}^E) &= \sum_{i=1}^B \log sig(t (P_\text{ally}(x^B_i,y^B_i)(1-P_\text{ally}(x^B_i,y^B_i)) - \theta_0)) \\
-                                  &+ \sum_{i=1}^B \log sig(t(-\min_{u} distance(x^B_i,y^B_i) + \theta_1)) \\
-                                  &+ \sum_{j=1}^E sig(t((x^E_j+y^E_j) - \alpha))
+\log p(\mathbf{x}^E,\mathbf{y}^E) &= \sum_{i=1}^B \log sigm(t (P_\text{ally}(x^B_i,y^B_i)(1-P_\text{ally}(x^B_i,y^B_i)) - \theta_0)) \\
+                                  &+ \sum_{i=1}^B \log sigm(t(-\min_{u} distance(x^B_i,y^B_i) + \theta_1)) \\
+                                  &+ \sum_{j=1}^E sigm(t((x^E_j+y^E_j) - \alpha))
 \end{align*}
 
 Where $B,E$ are number of battle and enemy,$x^B_i,y^B_i$ is coordinate of battle $i$, $x^E_j,y^E_j$
@@ -606,15 +698,15 @@ the prior. But it depict what we want in general.
 
 \subsubsection{The density of probabity of existence of enemy estimation}
 
-The one of advantage of VB is that it make computation of probability of special region very easy.
+The one of advantage of VB is that it make computation of probability of specific region very easy.
 The probability of exist of enemy in a given region $[x,x+dx]\times[y,y+dy]$ can be given by:
 
-$$
-pe(x,y,dx,dy) = 1 - \prod_i \left(
-(1-(\Phi(x+dx - \mu^X_i)/\sigma^X_i) -  (\Phi(x - \mu^X_i)/\sigma^X_i))
-(1-(\Phi(y+dy - \mu^Y_i)/\sigma^Y_i) -  (\Phi(y - \mu^Y_i)/\sigma^Y_i))
-\right)
-$$
+\begin{align*}
+pe(x,y,dx,dy) = 1 - \prod_i (
+& (1-(\Phi(x+dx - \mu_{X^E_i})/\sigma_{X^E_i}) -  (\Phi(x - \mu_{X^E_i})/\sigma_{X^E_i})) \\
+& (1-(\Phi(y+dy - \mu_{Y^E_i})/\sigma_{Y^E_i}) -  (\Phi(y - \mu_{Y^E_i})/\sigma_{Y^E_i}))
+)
+\end{align*}
 
 Where $\Phi(x)$ is standard cumulative probability function:
 
@@ -628,7 +720,7 @@ The three other are same.
 The existence density(approximated) is defined:
 
 $$
-pe(x,y) = pe(x-\epsilon,y-\epsilon,2\epsilon,2\epsilon)/(4*\epsilon^2)
+pe(x,y) = pe(x-\epsilon,y-\epsilon,2\epsilon,2\epsilon)/(4 \epsilon^2)
 $$
 
 Where $\epsilon$ is a small number, in there $\epsilon=0.01$. 
@@ -652,20 +744,21 @@ The comparing result can be seen in seen in Figure~\ref{fig:bigVbExist}.
 
 \section{Extention: Enemy movement detecting}
 
-Considering ally,enemy,battles have not only position, but also have timestamp. In another word,
-enemy and ally may move in the time, how do we infer the movement?
+Considering ally,enemy,battles have not only positions, but also have timestamp. In another word,
+enemy and ally may move in a time range, how do we infer the movement?
 
-Interestingly, the model only need a little modification to integrate the setting.
+Interestingly, the model requires only a bit of modifications to integrate the new specification.
 
 Assurming the time begin at $0$ and end at $1$, and enemy have uniform motion in constant speed.
 So the parameters$x^E_i$ can be rewritten as $x^E_i(t) = (1-t)x^E_i(0) + tx^E_i(1)$, 
-$x^E_i(0),x^E_i(1)$ means the position of ith enemy in time 0 and 1 respectively, and so on.
+where $x^E_i(0),x^E_i(1)$ means the positions of ith enemy in time 0 and 1 respectively, and so on.
 They are new parameters. The other structual probability function almost keep its original form.
 
 First, assurming $x^E_i(0),y^E_i(0)$ are known and $x^E_i(1),y^E_i(1)$ are unknown.
-A instance of inference shown in Figure~\ref{fig:bkeu}. Where arrowtail indicate the known begin point.
+A instance of inference is shown in Figure~\ref{fig:bkeu}. 
+Where arrowtail indicate the known begin point.
 The one of two arrowhead surrounded by sd ellipse is estimated $t=1$ coordination expectation. 
-The another is "true" point.
+The another one is "true" target point.
 
 \begin{figure}[h]
 \includegraphics[width=0.4\linewidth]{bkeu.png}
@@ -690,7 +783,7 @@ So it will be skiped.
 
 \section{Extention: Dealing complex position distribution.}
 
-The above content is based on similar distribution, a curve can divide ally and enemy easily.
+The above contents are based on similar distribution, a curve can divide ally and enemy easily.
 What will happen if the shape become complex and hard to capture for "one center" bayes naive classifer?
 
 \subsection{Circle}
@@ -710,11 +803,14 @@ showing also a nice iteration convege process .
 \subsection{Case study: The battle of Gettysburg}
 
 Now, it's the time to abandon the globular chicken in vacuum loved by physicists.
-The Figure~\ref{fig:gettysburg} show the map and data of the battle of Gettysburg in second day.
-The data only capture the division(NATO:XX)  in the map.
-The confederate have less number of division since the size of the division of CSA are more big.
+The Figure~\ref{fig:gettysburg} show the map and corresponding data of the battle of Gettysburg in second day.
+The data only capture the division(NATO:XX) and bridge brigade(NATO:X) in the map.
+\footnote{You may aware the top right corner is not matched well. 
+That is because The data depict state in morning and the map draw the situation in afternoon, the main battle time.
+So it miss the march time the former one may infer.}
+The confederate army have less number of divisions since the size of the divisions of CSA are more big.
 The data is from HPS great wargame "Civil war:Gettysburg". 
-The data used listed in the Table~\ref{tab:Confederate} and \ref{tab:Union}, in which strength 
+The data used are listed in the Table~\ref{tab:Confederate} and \ref{tab:Union}, in which strength 
 is number of unit that is not used in the model yet and will be used in later section as weight.
 
 \begin{table}
@@ -813,7 +909,7 @@ It looks good, thougn the enemy units seems too close to ally. It can be solved 
 
 \section{Extention: Size effect}
 
-The above content assurm battles and units are homogeneous. It may make sense,
+The above content assurms battles and units are homogeneous. It may make sense,
 but if battle and unit can include number and size information, the result will be more useful.
 
 To extend our model to embrace the change, we can merely define the high weight the unit have,
@@ -849,10 +945,517 @@ The forward model can transformed easily to backward model to do inference due t
 The inference include point detection, movement dectection with prior or adujusted prior.
 They're be checked its steady and converge performance by true initialization and random initialization.
 A case study about battle of Gettysburg summary the content covered by the paper. 
-I wish the result can be producation environment and my game designing.
+I wish the result can be producation environment and my game desigmning.
 
-Designing the forward model, doing its inference and balancing effciency and correctness 
+Desigmning the forward model, doing its inference and balancing effciency and correctness 
 are interesting challenge, but useful.
+
+\section{Core code implementing the model}
+
+This code section contain only the component defining the baseline model and do inference. 
+The full code about figure outputing, parameter tuning and model variants code can be checked in 
+\footnote{\url{https://github.com/yiyuezhuo/Undergraduate-thesis/tree/master/notebook}}.
+
+%Anyway, the section is added to deal with foolish paper Duplicate check system, so you would not 
+%expect its completeness since actually the source code is giant.
+
+The top code on baseline model:
+
+\begin{python}
+
+# model
+friend = Data(friend_point)
+battle = Data(battle_point)
+enemy = Parameter(enemy_point) # set real value as init value, though maybe a randomed init is more proper
+
+logPC = Data(_logPC)
+
+conflict_threshold = 0.2
+distance_threshold = 1.0
+tense = 10.0
+alpha = 5.0
+prior_threshold = 5.0
+prior_tense = 5.0
+
+def target():
+    friend_enemy = torch.cat((friend, enemy),0)
+    distance = cdist(battle, friend_enemy).min(dim=1)[0]
+    
+
+    mu = Variable(torch.zeros(2,2)) 
+    sd = Variable(torch.zeros(2,2))
+    
+    mu[0,:] = friend.mean(dim=0)
+    mu[1,:] = enemy.mean(dim=0)
+    sd[0,:] = friend.std(dim=0)
+    sd[1,:] = enemy.std(dim=0)
+    
+    conflict = torch.exp(norm_naive_bayes_predict(battle, mu, sd, logPC)).prod(dim=1)
+    p = soft_cut_ge(conflict,conflict_threshold, tense = tense) * soft_cut_le(distance, distance_threshold, tense = tense)
+    
+    target= torch.sum(torch.log(p))
+    return target
+
+def target2():
+    target1 = target()
+    # location prior
+    target2 = target1 + torch.sum(enemy.sum(dim=1))
+    return target2
+
+\end{python}
+
+The movement detecting model variant:
+
+\begin{python}
+def target():
+    # 由于每个时点所涉及的mu,sd发生了变化所以不能像之前那样统一的处理，暂时也没看出显然的向量化写法
+    target = Variable(torch.zeros(1))
+    for i in range(battle_point.shape[0]):
+        t = timestamp[i]
+        friend = friend0*(1-t) + friend1*t
+        enemy = enemy0*(1-t) + enemy1*t
+        single_battle = torch.unsqueeze(battle[i],0) 
+        
+        friend_enemy = torch.cat((friend, enemy), 0)
+        distance = cdist(single_battle, friend_enemy).min(dim=1)[0]
+        
+        mu = Variable(torch.zeros(2,2)) 
+        sd = Variable(torch.zeros(2,2))
+
+        mu[0,:] = friend.mean(dim=0)
+        mu[1,:] = enemy.mean(dim=0)
+        sd[0,:] = friend.std(dim=0)
+        sd[1,:] = enemy.std(dim=0)
+
+        conflict = torch.exp(norm_naive_bayes_predict(single_battle, mu, sd, logPC)).prod(dim=1)
+        p = soft_cut_ge(conflict,conflict_threshold, tense = tense) * soft_cut_le(distance, distance_threshold, tense = tense)
+
+        target+= torch.sum(torch.log(p))
+    return target
+
+\end{python}
+
+The weighted model variant about forward and backward:
+
+\begin{python}
+# model for forward
+reset()
+
+friend = Data(friend_point)
+battle = Data(xy)
+enemy = Parameter(enemy_point) # set real value as init value, though maybe a randomed init is more proper
+
+enemy_weight = Data(Confederate_weight)
+friend_weight = Data(Union_weight)
+enemy_dist_factor = Data(Confederate_dist_factor)
+friend_dist_factor = Data(Union_dist_factor)
+
+
+logPC = Data(_logPC)
+
+conflict_threshold = 0.2
+distance_threshold = 1.0
+tense = 10.0
+alpha = 5.0
+prior_threshold = 5.0
+prior_tense = 5.0
+
+def target_p():
+    friend_enemy = torch.cat((friend, enemy),0)
+    friend_enemy_dist_factor = torch.cat((friend_dist_factor,enemy_dist_factor),0)
+    
+    distance = (cdist(battle, friend_enemy)*friend_enemy_dist_factor).min(dim=1)[0]
+    #distance = distance * friend_enemy_dist_factor
+
+    mu = Variable(torch.zeros(2,2)) #目前外层还有个同名的numpy.array mu,sd变量不要搞混了
+    sd = Variable(torch.zeros(2,2))
+    '''
+    mu[0,:] = friend.mean(dim=0)
+    mu[1,:] = enemy.mean(dim=0)
+    sd[0,:] = friend.std(dim=0)
+    sd[1,:] = enemy.std(dim=0)
+    '''
+    _friend_weight = torch.unsqueeze(friend_weight,1)
+    _enemy_weight  = torch.unsqueeze(enemy_weight, 1)
+    
+    mu[0,:] = torch.sum(friend * _friend_weight,dim=0)
+    mu[1,:] = torch.sum(enemy  * _enemy_weight, dim=0)
+    sd[0,:] = torch.sqrt(torch.sum((friend - mu[0,:])**2 * _friend_weight, dim=0))
+    sd[1,:] = torch.sqrt(torch.sum((enemy  - mu[1,:])**2 * _enemy_weight, dim=0))
+    
+    conflict = torch.exp(norm_naive_bayes_predict(battle, mu, sd, logPC)).prod(dim=1)
+    p = soft_cut_ge(conflict,conflict_threshold, tense = tense) * soft_cut_le(distance, distance_threshold, tense = tense)
+    return p
+
+def target():
+    p = target_p()
+    
+    target= torch.sum(torch.log(p))
+    return target
+    
+# model for backward
+reset()
+
+friend = Data(friend_point)
+battle = Data(battle_point)
+enemy = Parameter(enemy_point) # set real value as init value, though maybe a randomed init is more proper
+
+logPC = Data(_logPC)
+
+conflict_threshold = 0.2
+distance_threshold = 1.0
+tense = 10.0
+alpha = 5.0
+prior_threshold = 5.0
+prior_tense = 5.0
+
+
+\end{python}
+
+There're bayes-torch related code.
+
+Class Model, defining the methods to do point estimation, vb and sampling.
+
+\begin{python}
+
+class Model:
+    def __init__(self):
+        self.parameters = []
+        self.n_parameters = 0
+        self.size_parameters = []
+    def reset(self):
+        self.parameters = []
+        self.n_parameters = 0
+        self.size_parameters = []
+    def add_parameter(self, variable):
+        self.parameters.append(variable)
+        self.n_parameters += np.prod(variable.size())
+        self.size_parameters.append(variable.size())
+    def set_parameter_meanfield(self, mu, omega):
+        n_parameters = self.n_parameters
+        param_samples_eta = np.random.normal(size=n_parameters)
+        param_samples = param_samples_eta*np.exp(omega) + mu
+        self.set_parameter(param_samples)
+        return param_samples_eta
+    def set_parameter(self, values, is_float = True):
+        # values is a flatten numpy array
+        start = 0
+        for param in self.parameters:
+            param_size = np.prod(param.size())
+            section = values[start:start+param_size].reshape(param.size())
+            tensor = torch.from_numpy(section)
+            if is_float:
+                tensor = tensor.float()
+            param.data = tensor
+            start += param_size
+    def collect_parameter_grad(self):
+        grad = np.empty(self.n_parameters)
+        start = 0
+        for param in self.parameters:
+            param_size = np.prod(param.size())
+            grad[start:start+param_size] = param.grad.data.numpy().copy().ravel()
+            start += param_size
+        return grad
+    def collect_parameter(self):
+        res = np.empty(self.n_parameters)
+        start = 0
+        for param in self.parameters:
+            param_size = np.prod(param.size())
+            res[start:start+param_size] = param.data.numpy().copy().ravel()
+            start += param_size
+        return res
+    def grad_q_meanfield(self, target_f, mu, omega, q_size=10, lr = 0.01):
+        n_parameters = self.n_parameters
+        
+        mu_grad = np.zeros(n_parameters)
+        omega_grad = np.zeros(n_parameters)
+        
+        optimizer = torch.optim.SGD(self.parameters, lr=lr)
+        # optimizer only serve to zero_grad.
+        
+        for i in range(q_size):
+            
+            param_samples_eta = self.set_parameter_meanfield(mu, omega)
+            
+            optimizer.zero_grad()
+            target = target_f()
+            target.backward()
+            
+            param_grad = self.collect_parameter_grad()
+            mu_grad += param_grad
+            omega_grad += param_grad * param_samples_eta
+        
+        mu_grad /= q_size
+        omega_grad /= q_size
+        omega_grad *= np.exp(omega)
+        omega_grad += 1.0
+        
+        return mu_grad,omega_grad
+            
+    def vb_meanfield(self, target_f, mu=None,omega=None, zero_init=False, 
+                     n_epoch = 100, lr=0.01, q_size = 10):
+        n_parameters = self.n_parameters
+        
+        if mu is None:
+            if zero_init:
+                mu = np.zeros(n_parameters)
+            else:
+                mu = np.array(self.collect_parameter())
+        if omega is None:
+            omega = np.zeros(n_parameters) # sigma=exp(omega) = 1
+        
+        #optimizer = torch.optim.SGD(self.parameters, lr=lr)
+        
+        for i in range(n_epoch):
+            mu_grad,omega_grad = self.grad_q_meanfield(target_f, mu, omega, q_size = q_size)
+            mu += lr * mu_grad
+            omega += lr * omega_grad
+        
+        return mu,omega
+        
+        
+    def vb_fullrank(self, target_f):
+        raise NotImplementedError
+    def vb_meanfield_format(self, res):
+        # res = (mu, omega) -> {Parameter1: {'mu': mu1, 'sigma': exp(omega1)}...}
+        mu, omega = res
+        
+        return_dict = {}
+        start = 0
+        for param in self.parameters:
+            param_size = np.prod(param.size())
+            _mu = mu[start:start+param_size].reshape(param.size())
+            _omega = omega[start:start+param_size].reshape(param.size())
+            return_dict[param] = {'mu':_mu,'omega':_omega}
+            start += param_size
+        return return_dict
+
+    def vb(self, target_f, method = 'meanfield', format=False, 
+                 reload=False, **kwargs):
+        if method == 'meanfield':
+            res = self.vb_meanfield(target_f, **kwargs)
+            if not format:
+                return res
+            self.set_parameter(res[0])
+            grad = self.grad(target_f) #当时的grad将被用来诊断是否收敛
+            grad_size = np.sum(grad**2)
+            converge = grad_size < 0.01
+            report = dict( method = 'meanfiled', 
+                           est = self.vb_meanfield_format(res),
+                           grad = grad,
+                           grad_size = grad_size,
+                           converge = converge)
+            if reload:
+                self.set_parameter(res[0])
+            return report
+        if method == 'fullrank':
+            return self.vb_fullrank(target_f, **kwargs)
+        raise NotImplementedError
+    def sampling_hmc(self, target_f, epsilon=0.01, L=20, M=100):
+        
+        def grad(theta):
+            self.set_parameter(theta)
+            return self.grad(target_f)
+        def likelihood(theta):
+            self.set_parameter(theta)
+            return target_f().data.numpy()
+        
+        sample =[]
+        sample.append(self.collect_parameter())
+        accept_list = []
+        
+        for m in range(M):
+            r0 = np.random.normal(size=self.n_parameters)
+            r = r0
+            theta0 = sample[-1]
+            theta = theta0.copy()
+            
+            for i in range(L):
+                r = r + 0.5 * epsilon * grad(theta)
+                theta = theta + epsilon * r
+                self.set_parameter(theta)
+                r = r + 0.5 * epsilon * grad(theta)
+            odd_up = np.exp(likelihood(theta)-0.5*np.dot(r,r))
+            odd_bottom = np.exp(likelihood(theta0)-0.5*np.dot(r0,r0))
+            alpha = min(1,odd_up/odd_bottom)
+            accept_list.append(alpha)
+            
+            if np.random.random() < alpha:
+                sample.append(theta)
+            else:
+                sample.append(theta0)
+        return sample
+        
+
+    def sampling(self, target_f, method= 'hmc', **kwargs):
+        #trace = []
+        #raise NotImplementedError
+        if method == 'hmc':
+            return self.sampling_hmc(target_f, **kwargs)
+        if method == 'nuts':
+            return self.sampling_nuts(target_f, **kwargs)
+        raise NotImplementedError
+    def optimizing(self, target_f, lr=0.01, n_epoch = 1000):
+        '''
+        After optimizing run, the result is stored in original torch variable.
+        target_f don't have any parameter, since the class serve to delete the trouble
+        '''
+        optimizer = torch.optim.SGD(self.parameters, lr=lr)
+        
+        for epoch in range(n_epoch):
+            optimizer.zero_grad()
+            target = target_f()
+            loss = -target
+            loss.backward()
+            optimizer.step()
+    def grad(self, target_f):
+        fake_lr = 1.0
+        optimizer = torch.optim.SGD(self.parameters, lr=fake_lr)
+        optimizer.zero_grad()
+        target = target_f()
+        target.backward()
+        return self.collect_parameter_grad()
+
+\end{python}
+
+Other helper function in bayes-torch:
+
+\begin{python}
+def torch_norm_log_prob(X,mu,sd):    
+    temp = -(X - mu)**2/(2*sd) 
+    temp = temp - 0.5 * torch.log(2.0 * np.pi * sd)
+    return temp
+
+def torch_norm_naive_bayes_predict(X,mu,sd,logPC):
+    # X: sample_size * features
+    # mu: class_size * features
+    # sd: class_size * featrues
+    # log_PC class_size
+    n_class = logPC.size()[0]
+    n_feature = X.size()[1]
+    n_sample = X.size()[0]
+    _X = torch_tile(X,[1,n_class]).resize(n_sample,n_class,n_feature)
+    cp = torch_norm_log_prob(_X, mu, sd).sum(dim=2) + logPC  
+    log_predict_prob = torch_transpose((torch_transpose(cp) - torch_logsumexp(cp,dim=1)))
+    return log_predict_prob
+    
+def torch_logsumexp(X,dim=0):
+    # numpy have this function
+    return torch.log(torch.exp(X).sum(dim=dim))
+
+def torch_tile(X,repeats):
+    # torch.repeat ~ numpy.tile
+    return X.repeat(*repeats)
+
+
+def torch_soft_cut_ge(x,threshold,tense=1.0):
+    return torch.sigmoid(tense*(x-threshold))
+
+def torch_soft_cut_le(x,threshold,tense=1.0):
+    return torch.sigmoid(tense*(-x+threshold))
+
+
+\end{python}
+
+Notebook specific code, the density estimation:
+
+\begin{python}
+
+def prob_point(x,y,dx,dy,_mu,_omega):
+    mu = _mu.reshape(enemy_point.shape)
+    sigma = np.exp(_omega.reshape(enemy_point.shape))
+    x = np.reshape(x,(-1,1))
+    y = np.reshape(y,(-1,1))
+    px  = stats.norm.cdf((x-mu[:,0])/sigma[:,0])
+    pdx = stats.norm.cdf((x+dx-mu[:,0])/sigma[:,0])
+    py  = stats.norm.cdf((y-mu[:,1])/sigma[:,1])
+    pdy = stats.norm.cdf((y+dy-mu[:,1])/sigma[:,1])
+    return (pdx - px) * (pdy - py)
+
+def prob_exist(x,y,dx,dy,_mu,_omega):
+    ememy_prob = prob_point(x,y,dx,dy,_mu,_omega)
+    return 1-np.prod((1 - ememy_prob).T,axis=0) 
+
+def prob_exist_limit(x,y,_mu,_omega,step=0.1):
+    p = prob_exist(x-step,y-step,2*step,2*step,_mu,_omega)
+    return p/(4*step*step)
+
+def show_change(show=False):
+    display_data()
+    for i in range(enemy_point.shape[0]):
+        #s = 0.1
+        plt.arrow(enemy_point[i][0], enemy_point[i][1], enemy.data[i][0] - enemy_point[i][0], enemy.data[i][1] - enemy_point[i][1],head_width=0.1)
+    plt.legend()
+    if show:
+        plt.show()
+
+
+def show_ellipse(mu,sd):
+    from matplotlib.patches import Ellipse
+    
+    #ax = plt.subplot(111)
+    ax = plt.gca() # get current axe, the lame method to support command style
+    show_change(show=False)
+    #res_reshaped = [r.reshape(enemy_point.shape) for r in res]
+    for i in range(enemy_point.shape[0]):
+        mu_x,mu_y = mu[i]
+        sd_x,sd_y = sd[i]
+        e=Ellipse((mu_x,mu_y), sd_x, sd_y, 0)
+        e.set_clip_box(ax.bbox)
+        e.set_alpha(0.1)
+        ax.add_artist(e)
+        
+    #plt.show()
+    
+    
+def show_vb(vb_res):
+    res = vb_res
+    model.set_parameter(res[0])
+    res_reshaped = [r.reshape(enemy_point.shape) for r in res]
+    mu = res_reshaped[0]
+    sd = np.exp(res_reshaped[1])
+    show_ellipse(mu,sd)
+    
+def multi_enemy_setting_show_exist_density(_enemy_point, target, title_string):
+    reset_enemy(_enemy_point)
+    res = vb(target)
+    show_vb(res)
+    p_exist = prob_exist_limit(xy[:,0],xy[:,1],res[0],res[1],step=0.001).reshape(xx.shape)
+    CS = plt.contour(xx,yy,p_exist)
+    #plt.contour(xx, yy, p_exist)
+    plt.clabel(CS)
+    #plt.title(title_string.format(i))
+    plt.gca().set_title(title_string.format(i))
+    plt.legend()
+
+    
+    
+plt.figure(figsize=(16,20)) #(x,y)
+for i in range(2, 10):
+    interp_x = np.linspace(_enemy_point[:,0].min(),_enemy_point[:,0].max(),i)
+    interp_y = np.interp(interp_x, _enemy_point[:,0], _enemy_point[:,1])
+    interp_xy = np.c_[interp_x,interp_y]
+    plt.subplot(4, 4, i-1)
+    multi_enemy_setting_show_exist_density(interp_xy, target , '{} with flat prior')
+
+for i in range(2, 10):
+    interp_x = np.linspace(_enemy_point[:,0].min(),_enemy_point[:,0].max(),i)
+    interp_y = np.interp(interp_x, _enemy_point[:,0], _enemy_point[:,1])
+    interp_xy = np.c_[interp_x,interp_y]
+    plt.subplot(4, 4, 8+i-1)
+    multi_enemy_setting_show_exist_density(interp_xy, target2 , '{} with diag prior')
+
+    #multi_enemy_setting_show(interp_xy, target2, '{} with diag prior')
+plt.title('multiple number setting for vb with exist density')
+plt.show()
+
+
+\end{python}
+
+
+
+%\begin{python}
+%\end{python}
 
 \bibliography{paper} 
 \bibliographystyle{ieeetr}
