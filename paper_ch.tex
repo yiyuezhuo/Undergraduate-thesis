@@ -13,6 +13,9 @@
 \usepackage{subcaption}
 \usepackage{booktabs}
 
+\usepackage{verbatim} % for block comment
+
+
 
 \usepackage[
   paper  = letterpaper,
@@ -88,13 +91,6 @@ breaklines=true,                 % come from https://tex.stackexchange.com/quest
 
 \begin{abstract}
 
-Assuming a location which have samller distance to two conflict factions have higher probability causing a battle,
-how do we infer the location of enemy if we can only observe the locations of allies and battles? 
-The latent variable inference problem requieres a suitable front probability model and a effiecent way to run the 
-inference. In this work, a battle model is introduced and a bayes inference framework based on pytorch 
-is developed to reach the inference task including point, movement detection and 
-exist probability estimation with different prior and various initialization value setting.
-A case study about The battle of Gettysburg is included to show the overview of the content covered by the paper.
 
 假设一个位置离敌我双方单位越近，则有更高的爆发一场战斗的概率。应当如何推断敌方单位的位置如果我们
 只能观测到友方和战斗发生的位置？这种隐变量推断问题需要一个设定恰当的正向生成概率模型一个有效的算法
@@ -107,19 +103,8 @@ A case study about The battle of Gettysburg is included to show the overview of 
 \tableofcontents
 
 
-
 \section{介绍}
 
-In real warfare, you can't observe enemy units even allies units as RTS or classic board wargame way.
-The only thing you can rely on are complex and confusing even self-contradiction information and misinformation.
-There're a lot of example, that general misunderstand information and may be defeated due to this. 
-Bing Sun manipulated field kitchen of his army to trick his opponent, General McClellan reject to attack
-due to "peace gun"(fake gun instrument) seted by south rebels, lossing oppotunity to beat rebel down.
-
-Unfortunately, current military decision similation program, 
-such as "classic" wargame (a example see Figure~\ref{fig:hps}) and somewhat  "serious" RTS, 
-tend to capture more "macro" aspect and simplify the reconnaissance and 
-information modeling aspect into a unaccepted level.
 
 在真实战场上，你不能观测到像RTS和经典桌上兵棋那样直接观测到敌方单位，甚至连友方单位都不能观测到。
 你能依赖的唯一的东西就是那些混乱复杂乃至自相矛盾的信息和谣言。有很多因为错误信息导致失败的例子，
@@ -134,20 +119,11 @@ information modeling aspect into a unaccepted level.
 
 \begin{figure}[ht]
 \includegraphics[width=0.6\linewidth]{SmolenskR4.jpg}
-\caption{This figure show the reconnassance treatment of Smolensk' 41, 
-a classic hex wargame developed by HPS.
-Units can only be observed wholly or can't be observed.
+\caption{
 图中展示了经典兵棋公司HPS的作品斯摩棱斯克41对侦查的处理——单位仅能出于完全可知和完全不可知的状态。 }
 \label{fig:hps}
 \end{figure}
 
-Though we can read the oob(order of battle) as Figure~\ref{fig:metz} from map of battle, 
-but it's obvious that those marks are placed in there using post Liang Zhuge information. 
-In real time battle field, you can only hear where be attacked and where observe the trace of enemy 
-(instead of unit detail id or somewhat weird strange quatity information), 
-and some of them may be wrong and some of them may be released by enemy to confuse you.
-The movement of Jackson in valley campaign is a vivid example about how the fake information intentionally
-made by oppnent get the change to weaken the strength of army.
 
 尽管我们经常可以直接在事后画的战场局势图上看到战斗序列（即那些方框图标），如图~\ref{fig:metz}。
 但是显然这些标记是根据事后对照双方信息才得以制成的，在真实战场上，我们并不能指望某些“地图模拟软件”
@@ -157,22 +133,12 @@ made by oppnent get the change to weaken the strength of army.
 
 \begin{figure}[ht]
 \includegraphics[width=0.6\linewidth]{metz.jpg}
-\caption{The map of battle of Metz, showing oob that can't be observed in real time battlefied.
+\caption{
 梅兹战役地图，地图展示了并不应该在真实战场上所能看到的OOB }
 \label{fig:metz}
 \end{figure}
 
 
-There are some work were made to solve this problem 
-\cite{hostetler2012inferring} \cite{vsmejkal2016integrating} \cite{touhou}.
-Since they filter small part of information from replay file, they made a case that enemy can not be 
-seen in that direct way, then they proposed according probability model to rebuild real situation.
-Those're good tries, but not real demands for most of case. The paper we
-\footnote{Though the paper only have a writer, 
-but "we" seems a traditional and kind pronoun for such paper. 
-In following content, both "we" and "I" will be used to represent the writer.} 
-wrote will deal the problem in a more direct and intuitive way. 
-A coordinate based position and movement detecting method is present in this paper.
 
 已经有一些工作致力于解决这一信息处理方式过于简单暴力的问题，如
 \cite{hostetler2012inferring} \cite{vsmejkal2016integrating} \cite{touhou}。
@@ -184,24 +150,17 @@ A coordinate based position and movement detecting method is present in this pap
 
 \subsection{简单模型}
 
-In forward model, a process that can give probility of number of battles and the mass in support space 
-is required. For example, given ally and ememy location setting as Figure~\ref{fig:stateNoBattle}.
-
 在正向生成模型中，可以定义一个二维随机点过程，首先抽一个战役数量，然后独立同分布的从一个二维分布中
 抽取那个数量的战役坐标。例如，给定如图~\ref{fig:stateNoBattle}所示友军和敌军的地点位置：
 
 \begin{figure}[ht]
 \includegraphics{state_no_battle.png}
-\caption{Ally and enemy setting
+\caption{
 友军和敌军的位置设定}
 \label{fig:stateNoBattle}
 \end{figure}
 
 
-Suppose the the number of battle is $10$ 
-\footnote{ Though the number can modeled as it draw from a given distribution by adding 
-stochastic process, it be not adpoted due to its extra difficulty in express.}
-, we can model the $10$ battles are indepently drawn from below distribution:
 
 假定战役数是$10$\footnote{为了简化，后文的战役数都是给定的而不是随机过程的一部分。}
 于是可设这$10$个战役是从下述分布所抽取出来的：
@@ -210,8 +169,6 @@ $$
 P(x,y) \propto \max_i p^A_{i}(x,y) \max_j p^E_{j} (x,y)
 $$
 
-Where $p^A_{i}(x,y)$ indicate the probability density "released" from of i’st ally unit,
-$p^E_{j}$ indicate same thing from j’st enemy unit. And the density is defined by:
 
 这里 $p^A_{i}(x,y)$ 表示第$i$个友方单位“散布”出来的概率密度,
 $p^E_{j}$ 表示第$j$个敌方单位单位对应的密度。这个密度又被定义为:
@@ -221,8 +178,6 @@ $$
 P^S_i(x,y) \propto \exp(-\frac{1}{2}((x-x^S_i)^2 + (y-y^S_i)^2))
 $$
 
-Where the probability in $(x,y)$ released from i'th unit of S side($S \in \{A,E \}$). 
-So the above formula can be rewritten as: 
 
 表示$S$方（$S \in \{A,E  \}$）第$i$个单位在点$(x,y)$释放的概率。故而上式可被重写为: 
 
@@ -230,13 +185,6 @@ $$
 P(x,y) \propto \exp(-\frac{1}{2}((x-x_{nearst(x,y)})^2 + (y-y_{nearst(x,y)})^2))
 $$
 
-Where $nearst(x,y)$ point to the unit(enemy or ally) which is nearest to (x,y).
-
-This means the non-normalized probability is only subject to the nearest two conflict units’s distance. 
-Though the assumption don’t have abundant meaning,
-it capture something crucial but have obvious weakness such as independent hypothesis, 
-lately the model will be adujusted mutiple times to resolve this and other problems. 
-Anyway, the probability can be computed and visualized as contour Figure~\ref{fig:stateNoBattleProb}.
 
 这里$nearst(x,y)$表示离点$(x,y)$最近的单位（敌方或友方）。
 
@@ -247,16 +195,10 @@ Anyway, the probability can be computed and visualized as contour Figure~\ref{fi
 
 \begin{figure}[ht]
 \includegraphics{state_no_battle_prob.png}
-\caption{Battle density distribution 战役发生概率密度分布}
+\caption{战役发生概率密度分布}
 \label{fig:stateNoBattleProb}
 \end{figure}
 
-The probability distribution don't have a standard shape, implying it's hard to sample. 
-To overcome this, the "grid sampling" technology is used. In this example,
- the support of density is limited to $[-1,5] \times [0,6]$
-(that is, the point out of set $[-1,5] \times [0,6]$ have zero density). 
-And $100 \times 100$ points are selected to build a grid approxmation. 
-See a size-reduced example serve to eye in Figure~\ref{fig:gridify}.
 
 显然这个概率分布的形状并不是哪种已知解析形式，从而从它中采样变成了个难题。 
 这里使用所谓格采样法解决这个问题，考虑到这个问题的维度并不高。本例中，首先限制
@@ -268,16 +210,10 @@ See a size-reduced example serve to eye in Figure~\ref{fig:gridify}.
 
 \begin{figure}[ht]
 \includegraphics[width=0.6\linewidth]{gridify.png}
-\caption{$25 \times 25$ discrete approxmation 离散近似}
+\caption{$25 \times 25$ 离散近似}
 \label{fig:gridify}
 \end{figure}
 
-So firstly we draw a square in the grid according to the approximated probability, 
-and then draw two uniform variable $dX \sim U(0,5-(-1)/100),dY \sim U(0,(6-0)/100)$ 
-to determine the position drew by this process.
-
-Repeating the process 10 times, 
-we can get size 10 independent sample from the distribution as such Figure~\ref{fig:stateSampleBattle}.
 
 给出离散近似后，首先按离散概率从此二维网格中选一个格子，然后加上均匀分布噪声 
 $dX \sim U(0,5-(-1)/100),dY \sim U(0,(6-0)/100)$ ，算出随机到的位置。
@@ -287,33 +223,22 @@ $dX \sim U(0,5-(-1)/100),dY \sim U(0,(6-0)/100)$ ，算出随机到的位置。
 
 \begin{figure}[ht]
 \includegraphics[width=0.6\linewidth]{state_sample_battle.png}
-\caption{Ally,enemy,prob, and a sample of battle 敌友军，战役概率与一个特定战役样本}
+\caption{敌友军，战役概率与一个特定战役样本}
 \label{fig:stateSampleBattle}
 \end{figure}
 
-If the positions of enemy is hidden, 
-then we can get a instance of problem data as Figure~\ref{fig:stateNoEnemy}.
 
 这时如果把敌人的位置隐去，就可以得到实际推断中所用的数据，如图~\ref{fig:stateNoEnemy}。
-如频率主义稻草人式讨论，可以通过比较生成过程隐去的真实值与推断的值来判定推断的效能。
+类似频率主义稻草人式讨论，可以通过比较生成过程隐去的真实值与推断的值来判定推断的效能。
 
 \begin{figure}[ht]
 \includegraphics[width=0.6\linewidth]{state_no_enemy.png}
-\caption{hide enemy 隐藏敌人后，实际推断时所能看到的信息}
+\caption{隐藏敌人后，实际推断时所能看到的信息}
 \label{fig:stateNoEnemy}
 \end{figure}
 
 \subsection{另一种模型设定}
 
-Although the distribution may satisfy our goal, 
-but the $\min$ function will make that gradient-based optmization method difficult to effect 
-in those units whose is not nearest to observed battle. 
-So a another specification is proposed below to get it done:
-
-First, a differentiable classifier is used to determine the "conflict level" in every point.
-Supposing a point is more likely be controled by S side 
-if a unit of S side have shortest distance to it, then we can define that the more two control probability 
-being close to eachother, the more conflict chance in this point. So the conflict factor is defined by:
 
 尽管这个分布看上去好像还不错，但是$\min$函数使得之后将介绍的三种基于梯度下降的方法无法发挥作用。
 如考虑一个敌军备选点如果并没有任何战役点的最近敌军点是它，则它并不能接收到任何梯度信息，
@@ -326,11 +251,6 @@ $$
 P_{\text{conflict}}(x,y) = P_\text{ally}(x,y) P_\text{enemy}(x,y) = P_\text{ally}(x,y)(1-P_\text{ally}(x,y))
 $$
 
-Where $P_\text{ally}(x,y)$ indicate the probability(belief) of $(x,y)$ being classified 
-into ally set given by classifer.
-
-In this paper, we use naive bayes classifer as classifer since it helps gradient computation. 
-The classification probability are given by:
 
 这里$P_\text{ally}(x,y)$表示点$(x,y)$被分类器分类为友军的概率。
 
@@ -346,14 +266,12 @@ N(x \mid \mu^E_X , \sigma^E_X N(y \mid \mu^E_Y , \sigma^E_Y)
 }
 $$
 
-Where $N(x \mid \mu,\sigma)$ is normal probability density function:
 
 这里$N(x \mid \mu,\sigma)$是正态分布概率密度分布函数：
 $$
 N(x \mid \mu,\sigma) = \frac{1}{\sqrt{2\pi \sigma^2}} \exp\left(\frac{(x-\mu)^2}{2\sigma^2}\right)
 $$
 
-The classifier parameters $\mu,\sigma$ are estimated by normal moment estimation. 
 
 分类器所用的参数$\mu,\sigma$以标准的矩估计法估计得到：
 
@@ -362,9 +280,6 @@ The classifier parameters $\mu,\sigma$ are estimated by normal moment estimation
 \sigma_Z^S &= 1/N^S (Z_i^S - \mu_Z^S)^2
 \end{align*}
 
-Where $Z \in \{ X,Y \}$ and $S \in \{ A,E \}$. $N_S$ is number of units of side $S$.
-
-A living example of classify probability can be seen in Figure~\ref{fig:naivebayes}.
 
 这里 $Z \in \{ X,Y \}$ ，$S \in \{ A,E \}$。而 $N_S$为$S$方的单位数量。
 
@@ -372,12 +287,10 @@ A living example of classify probability can be seen in Figure~\ref{fig:naivebay
 
 \begin{figure}[ht]
 \includegraphics[width=0.6\linewidth]{naivebayes.png}
-\caption{naive bayes predict probability coutour map 朴素贝叶斯分配器预测概率等高线图}
+\caption{朴素贝叶斯分配器预测概率等高线图}
 \label{fig:naivebayes}
 \end{figure}
 
-Then, we define that the less the distance between point and any units(ally or enemy) be,
-the more likely the point will occur a battle.
 
 接下来，定义距离因子吸收回之前模型的距离信息。点与最近的单位的距离越小，则越有可能产生一场战斗，
 定义为：
@@ -386,10 +299,6 @@ $$
 P_{\text{distance}}(x,y) = \exp(-\alpha \min_{u} distance)
 $$
 
-Where $u$ means any unit. $\min_u distance$ the shortest distance in all possible distance 
-between coordinate of unit and $(x,y)$.
-
-So the probability is:
 
 这里$u$意味任意单位。$\min_u distance$所有单位所在点到点$(x,y)$之间的距离中最短者。
 
@@ -400,22 +309,16 @@ P(x,y) = P_{\text{conflict}}(x,y) P_{\text{distance}}(x,y) =
 P_\text{ally}(x,y) P_\text{enemy}(x,y) \exp(-\alpha \min_{u} distance)
 $$
 
-Set $\alpha=0.1$, the 2d function can be seen in Figure~\ref{fig:combOne}:
 
 设$\alpha=0.1$，这个二维函数值可见图~\ref{fig:combOne}：
 
 \begin{figure}[ht]
 \includegraphics[width=0.6\linewidth]{comb1.png}
-\caption{Combining a naive bayes classifier and a smooth distance factor
+\caption{
 组合朴素贝叶斯分类器与平滑的距离因子后的战斗概率}
 \label{fig:combOne}
 \end{figure}
 
-The smooth probability seems good, but the sampled result seems too diffused 
-(see Figure~\ref{fig:combTwo}) and if scale is enlarged, 
-the problem even worsen (see Figure~\ref{fig:combThree}).
-Some parameters tuning are tried but not satisfy the demand. 
-So the smooth function family are removed and uniform distribution is employed. 
 
 光滑化概率虽然看起来不错，但是经过实验发现抽出来的样本有点过于分散了（见图~\ref{fig:combTwo}）
 而如果将考虑区域加大，则情况会变得更糟（见图~\ref{fig:combThree}）。
@@ -424,21 +327,21 @@ So the smooth function family are removed and uniform distribution is employed.
 
 \begin{figure}[ht]
 \includegraphics[width=0.6\linewidth]{comb2.png}
-\caption{Too diffused sample 过于分散的样本}
+\caption{过于分散的样本}
 \label{fig:combTwo}
 \end{figure}
 
 \begin{figure}[ht]
 \includegraphics[width=0.6\linewidth]{comb4.png}
-\caption{When extend the scale, unrational sample will present inevitably.
+\caption{
 当扩大讨论范围后，不合理的样本不可避免地出现}
 \label{fig:combThree}
 \end{figure}
 
-\subsection{Empolyed setting}
+\subsection{使用的基线模型}
 
-We assign a point constant probability 
-if it is greater than conflict threshold and less than distance threshold:
+%We assign a point constant probability 
+%if it is greater than conflict threshold and less than distance threshold:
 
 %这段和上面合一起了
 
@@ -451,21 +354,16 @@ P(x,y) \propto
 \end{cases}
 $$
 
-Figure~\ref{fig:combFive} shows how the unrational sample point is suppressed by the way.
 
 图~\ref{fig:combFive}展示了样本点被强制落在阈值确定的区域内，解决了过于分散的困境。
 
 \begin{figure}[ht]
 \includegraphics[width=0.6\linewidth]{comb5.png}
-\caption{Forced 0 zero probability can suppress the unrational point
+\caption{
 强制0概率可以解决不合理点的麻烦}
 \label{fig:combFive}
 \end{figure}
 
-To get gradient information to proceed optimization, 
-rewrite the conditional jump function to "soft" version, 
-just like relation of ReLu and softplus in machine learning. 
-For example, sigmmoid function $sigm(x) = \frac{1}{1+\exp(-x)}$:
 
 不过这个设定同样有无法传递梯度信息问题，这里采用机器学习常用的“软化”方法（如机器学习把ReLu换成softplus）
 来截断函数转为S型函数，这里采用sigmoid函数 $sigm(x) = \frac{1}{1+\exp(-x)}$：
@@ -474,8 +372,6 @@ $$
 P(x,y) \propto sigm(t (P_\text{ally}(x,y) (1-P_\text{ally}(x,y)) - \theta_0)) sigm(t(-\min_{u} distance + \theta_1))
 $$
 
-Where $t$ is "tense" parameter controling the shape of sigmoid, $\theta_0,\theta_1$ are threshold for
-conflict level and distance. For $\theta_0=0.2,\theta_1=1.5,t = 10.0$, the result can be show in Figure~\ref{fig:combSix}.
 
 这里 $t$ 是“紧绷度”参数，其控制了sigmoid函数的陡度, $\theta_0,\theta_1$是冲突程度和距离的阈值。
  设 $\theta_0=0.2,\theta_1=1.5,t = 10.0$，其效果可见图~\ref{fig:combSix}.
@@ -483,33 +379,20 @@ conflict level and distance. For $\theta_0=0.2,\theta_1=1.5,t = 10.0$, the resul
 
 \begin{figure}[ht]
 \includegraphics[width=0.6\linewidth]{comb6.png}
-\caption{Selected model 基线模型}
+\caption{基线模型}
 \label{fig:combSix}
 \end{figure}
 
-The model seems perfect to our demand, following article will use it as baseline model.
 
 后文将使用这个模型和参数设定作为基线模型。
 
 \section{推断的算法和框架}
 
-A bayes inference framework is a programming language or a library that is made to organize the 
-programming for model and inference related optmization code.
 
 贝叶斯推断框架是组织模型设定和推断方法的库或者领域特定语言。
 
 \subsection{既有的推断框架}
 
-There're a lot of inference framework such as Stan \cite{carpenter2017stan}, 
-pymc\cite{patil2010pymc} and edward \cite{tran2016edward}. 
-The core of them are a automated gradient computation library, 
-they're stan-math, theano, tensorflow respectively. 
-
-Nevertheless, those except stan are too weak in their ability describing complex probabiliy function.
-And the compile time of stan is too long. 
-So a light-weight bayes inference library is proposed to fulfill our goal. 
-The framework is based on pytorch providing a flexible automated gradient computation lib and 
-easy-to-use dynamic computation graph like Chainer.
 
 现在已经很多流行的推断框架，如 Stan \cite{carpenter2017stan}，
 pymc\cite{patil2010pymc} ， edward \cite{tran2016edward}. 
@@ -518,7 +401,6 @@ pymc\cite{patil2010pymc} ， edward \cite{tran2016edward}.
 
 \subsection{推断方法和算法介绍}
 
-In this section, three inference method used below sections will be introduced.
 
 这节将介绍三种后文反复使用的推断方法。本文为了推断的灵活起见自己开发了一个被称作bayes-torch的基于
 pytorch作为自动求导库的库
@@ -527,10 +409,6 @@ pytorch作为自动求导库的库
 
 \subsubsection{最大后验估计}
 
-Maximum A Posteriori(MAP) is a estimator that maximize the likelihood function 
-coporating prior information. Since the task of gradient computation is done by pytorch, 
-we can only call the SGD or any other artful NN(neural net)-oriented optimizer to do standard gradient 
-descent (take $loss = -likelihood \times prior$) process. See Algorithm~\ref{alg:sgd}.
 
 最大后验估计（MAP）找到使得似然函数和先验概率最大化的点作为估计值。由于梯度计算可以用pytorch自动完成，
 这里只需调用SGD或者pytorch提供的其他面向神经网络的优化器（毕竟pytorch本身是用来实现动态神经网络的）
@@ -552,8 +430,6 @@ descent (take $loss = -likelihood \times prior$) process. See Algorithm~\ref{alg
 
 \subsubsection{变分推断}
 
-Variational inference use simple joint distribution setting to approximate complex 
-exact posterior distribution, using Kullback-Leibler(KL) diversity as optimizing target \cite{blei2017variational}. That is:
 
 变分推断使用简单的分布区近似复杂的精确后验分布。它的优化目标是使得变分（近似）分布与原分布的Kullback-Leibler(KL)散度最小化
 \cite{blei2017variational}，也就是说：
@@ -562,19 +438,6 @@ $$
 KL(q||p) = E_q \left( \log \frac{q(\theta \mid \mu,\omega)}{p(\theta \mid x)} \right)
 $$
 
-Where $p(\theta \mid x)$ is exact posterior distribution. 
-$q(\theta)$ is corresponding variational distribution approximating the exact one.
-The family of $q(\theta)$ are usually employed as normal distribution, especially $N(\mu,\mathbf{\sigma})$ form.
-If $\mathbf{\sigma}=\mathrm{diag}(exp(\mathbf{\omega}))$, 
-that is so called meanfield setting we will see it in following content.
-%$q(\theta \mid \mu,\omega)$ is corresponding variational distribution approximating the exact one
-%and the $\mu,\omega=\log(\sigma)$ means the distribution is in normal family with independent variable(meanfield).
-%The $\mu,\omega$ will be omited in following content.
-
-Since it employ variational(approximated) distribution $q(\theta)$ as expectation weight 
-instead of exact posterior distribution,
-the computation difficulty is relative reduced. But it seems too hard to deal too. 
-So we turn to considering evidence lower bound(ELBO) which is lower bound for $\log p(x)$:
 
 这里$p(\theta \mid x)$是精确后验分布。$q(\theta)$是对应的近似精确分布的近似分布。
 $q(\theta)$的分布族经常为了计算方便而选为正态分布，即$N(\mu,\mathbf{\sigma})$形式。
@@ -590,7 +453,6 @@ $q(\theta)$的分布族经常为了计算方便而选为正态分布，即$N(\mu
           &\ge E_q (\log p(x,\theta)) - E_q(\log q(\theta)) = \mathrm{ELBO}
 \end{align*}
 
-The relation of KL diversity and ELBO can be show:
 
 KL散度和ELBO的关系如下：
 
@@ -602,19 +464,6 @@ KL(q(\theta) || p(\theta \mid x)) &= E_q \log \frac{q(\theta)}{p(\theta \mid x)}
                                   &= -\mathrm{ELBO} + \log p(x)
 \end{align*}
 
-So we can maximizing ELBO to minimizing KL diversity. 
-To do the optimization, the tradition variational inference method, 
-Coordinate ascent variational inference (CAVI) algorithm,
-require a analytic conditional expectation $E_{-j}(\log p(\theta_j \mid \mathbf{\theta}_{-j},\mathbf{x}))$. 
-It's annoy when lazy statistician aware that he can do sampling to
-reach same goal without any of such brain exhausted brain challenges. 
-
-The Automatic differentiation variational inference (ADVI) is presented by 
-\cite{kucukelbir2017automatic} and \cite{kucukelbir2014fully} to fix it. 
-The core of the algorithm is to use random integral to approximate a hard-to-deal expectation.
-
-Algorithm~\ref{alg:advi} is a simplified version from \cite{kucukelbir2017automatic}, benefited that we don't need transform
-the support of restricted variable to unconstrained space.
 
 所以可以最大化ELBO来最小化KL散度。做这个优化的传统变分推断算法，所谓的坐标提升变分推断（CAVI）算法
 要求解析的计算条件期望$E_{-j}(\log p(\theta_j \mid \mathbf{\theta}_{-j},\mathbf{x}))$。
@@ -648,10 +497,6 @@ the support of restricted variable to unconstrained space.
 \label{alg:advi}
 \end{algorithm}
 
-The ADVI use noised gradient to find posterior expect that is equal to MAP(with more low effiecency),
- and collect gradient shock and concussion to estimate posterior variance.
- 
-In this paper, meanfield normal approximation is employed. That is:
 
 ADVI使用带噪声的梯度找到后验期望这一部分有点像降低效率版的MAP，不过这个噪声降低了期望的“估计效率”
 的同时也提供了估计方差的机会。
@@ -663,10 +508,6 @@ p(x^E_1,\dots,x^E_{N_E},y^E_1,\dots,y^E_{N_E} \mid D) \sim
 N((\mu_{X^E_1},\dots,\mu_{y^E_{N_E})^T},\mathrm{diag}(\sigma_{X^E_1},\dots,\sigma_{y^E_{N_E}}))
 $$
 
-Where $p(x^E_i \mid D) \sim N(\mu_{x^E_i},\sigma_{x^E_i}^2)$. 
-Such $\mu_{x^E_i},\sigma_{x^E_i}^2)$ are called variational(approximated) parameters. 
-it's called meanfield since the covariace matrix is a diagonal matrix, 
-excluding all of correlation between randomized parameters.
 
 条件独立性蕴含$p(x^E_i \mid D) \sim N(\mu_{x^E_i},\sigma_{x^E_i}^2)$，
 其中$D$指模型中的已知数据，即给定的友方军队位置和战役位置。而诸如$\mu_{x^E_i},\sigma_{x^E_i}^2)$
@@ -674,12 +515,6 @@ excluding all of correlation between randomized parameters.
 
 \subsubsection{采样法}
 
-Variational inference is only a approximating method, 
-sampling from posterior distribution directly is exact but resource expensive method. 
-Classic Hasting-Metropolis method rely on a proposed distribution manually specified by statistician
-and suffer bad converge effciency. 
-The Hamiltonian Monte Carlo \cite{hoffman2014no} (See Algorithm~\ref{alg:hmc}) can be employed to improve the effciency,
-using gradient information instead of proposed distribution to give next step in random walking. 
 
 变分推断只是近似方法，从后验分布中直接采样开销很大但是是精确方法（虽然它的保证收敛并没有看上那么有用）。
 经典的Hasting-Metropolis法要使用手动指定的proposed分布，而且收敛效率不佳。哈密顿蒙特卡洛
@@ -711,22 +546,16 @@ using gradient information instead of proposed distribution to give next step in
 \label{alg:hmc}
 \end{algorithm}
 
-HMC follow the same way as ADVI using gradient pulse and bounce.
-
-HMC and other sampling method return a "trace" sample that can be used 
-to build empirical posterior distribution. In this paper, the trace almost always been see as
-parameters of normal distribution to compare to VB(ADVI) thougn it drop the main advantage of sampling method.
 
 HMC使用与ADVI类似的利用梯度冲击和震荡收集方差信息。
 
 HMC和其他采样法会返回随机游走轨道，这个轨道可以近似的看做精确后验分布的采样样本，所以可以用来计算
 其他参数或者生成经验分布函数之类的。后文并不会利用采样法的精确特征，基本只用上它的期望和方差，类似于ADVI。
 
-\section{Inference experiments 推断实验}
+\section{推断实验}
 
-\subsection{Enemy position detecting 敌军位置探测}
+\subsection{敌军位置探测}
 
-The situation (see Figure~\ref{fig:expState}) will be used as inference experiment data.
 
 如图~\ref{fig:expState}所示的局势会被用在下面的推断实验中。
 
@@ -739,7 +568,6 @@ The situation (see Figure~\ref{fig:expState}) will be used as inference experime
 
 \subsubsection{MAP}
 
-Firstly, if flat prior is used (only provide likelihood), the MAP result is Figure~\ref{fig:MAPone}.
 
 首先，如果使用均匀先验（等价于只有似然函数起作用），MAP的估计结果可见于图~\ref{fig:MAPone}。
 
@@ -749,11 +577,6 @@ Firstly, if flat prior is used (only provide likelihood), the MAP result is Figu
 \label{fig:MAPone}
 \end{figure}
 
-The arrowtail indicate the "true" position of enemy(though it can't be seen), 
-the arrowhead indicate the estimated position of enemy for MAP. As we can see,
-a enemy is pulled to the back of ally units to maximize probability, it seems overfit anyway.
-We can utilize the advatage of bayes framework, adding a prior \footnote{Or regulation term, but I
-prefer the probability meaning offered by bayes.}:
 
 箭头尾指向对应敌军的“真实位置”（对推断来说不可见），箭头头指向MAP估计的敌军位置。正如所见，
 有一个敌军单位的估计位置被拉到友军后方以最大化概率，很明显的过拟合的标志。
@@ -764,11 +587,6 @@ $$
 P_{\text{enemy}}(x,y) = \exp(sigm(t((x+y) - \alpha)))
 $$
 
-Where $t$ is tense parameter for enemy position,
-$\alpha$ is corresponding threshold. We set $t=5.0,\alpha=5.0$
-for illustration below.
-
-The new joint probability with the diagonal prior is:
 
 这里$t$是敌军位置的紧绷度参数。$\alpha$是对应的阈值。这里设$t=5.0,\alpha=5.0$。
 
@@ -780,10 +598,6 @@ The new joint probability with the diagonal prior is:
                                   &+ \sum_{j=1}^{N_E} sigm(t((x^E_j+y^E_j) - \alpha))
 \end{align*}
 
-Where $N_B,N_E$ are number of battle and enemy,$x^B_i,y^B_i$ is coordinate of battle $i$, $x^E_j,y^E_j$
-is coordinate of enemy $j$.
-
-The result of MAP on the new probability function looks better as shown in the Figure~\ref{fig:MAPtwo}.
 
 这里$N_B,N_E$是战役和敌人单位的个数。$x^B_i,y^B_i$是第$i$个战役的坐标。$x^E_j,y^E_j$是第$j$个敌人的坐标。
 
@@ -795,20 +609,16 @@ The result of MAP on the new probability function looks better as shown in the F
 \label{fig:MAPtwo}
 \end{figure}
 
-\subsubsection{Sampling and Variational inference 采样和变分推断}
+\subsubsection{采样和变分推断}
 
-Point estimation is not enough since it can't give uncertain information about the estimation.
-Tough exact posterior may fix it but it's hard to compute and represent. Two ways in bayes inference 
-to do it are sampling and variational inference(VI). The former one generate a "trace" which can be thought
-as a sample taken from exact posterior, the trace may contitude empirical distribution or reveal 
-attribution of the random parameter. The VI is faster but lack exact attribution.
-
-The two results of VI in flat prior and new diagonal prior can be seen in Figure~\ref{fig:VI}.
-The two results of sampling can be seen in Figure~\ref{fig:samping}.
 
 点估计本身没有给出关于估计的不确定性信息。尽管精确后验分布的参数可以直接给出但是难以计算。
 贝叶斯推断中两种解决方式就是采样和变分推断（VI）。前者产生一个与精确后验相关的随机游走轨迹，其可以看做
 从后验中采样出来的，精确但是效率低下，而变分推断快得多但是理论上仅是近似。
+
+分别采用均匀先验和对角先验两次变分推断拟合结果见图~\ref{fig:VI}。
+
+分别采用均匀先验和对角先验两次采样结果见图~\ref{fig:samping}。
 
 \begin{figure}[ht]
   \begin{subfigure}[b]{0.45\linewidth}
@@ -852,15 +662,6 @@ The two results of sampling can be seen in Figure~\ref{fig:samping}.
   \label{fig:samping}
 \end{figure}
 
-Where the coordinate of ellipses indicate the expectation of those posterior distribution,
-and the radius of ellipses indicate the standard deviation(sd) of axis x and y in every latent enemy point.
-So those ellipse can be seen as a rough approximation for posterior distribution 
-hidden in trace or variational distribution, though those two are not exact posterior too.
-
-The HMC result seems inconsisitency, implying the converge fail. Though increasing sample size may be
-solution(see Figure~\ref{fig:SamplingTen}). But just like we are not content to a NP-hard solver and claim that it only need more time,
-sampling seems too weak in this problem.
-
 图中的椭圆的中心表示拟合的后验分布（以参数化正态分布或轨迹的经验分布表示）$x,y$的期望，
 椭圆的两轴长表示拟合的后验分布的$x,y$的标准差。故而这些椭圆可以看成对计算得近似后验分布的一个粗略表示。
 
@@ -889,12 +690,7 @@ sampling seems too weak in this problem.
   \label{fig:SamplingTen}
 \end{figure}
 
-\subsection{Mutiple enemy number setting 变化敌人数量设定}
-
-The above estimation is based on "true" number of enemy. Let we test its stability. 
-What happen if the given number of number of enemy is wrong? The Figure~\ref{fig:bigVb} 
-show the result, that flat prior seems well while diagonal prior may may be dominated by 
-the prior. But it depict what we want in general.
+\subsection{变化敌人数量设定}
 
 上面的估计都基于“真实”的敌人数量。为了讨论此算法的稳定性，特别是实际不知道敌人确切数量，
 乃至给出的数量与实际数量偏差很大时，算法会给出什么结果？图~\ref{fig:bigVb}展示了不同数量设定下的
@@ -907,10 +703,8 @@ the prior. But it depict what we want in general.
 \label{fig:bigVb}
 \end{figure}
 
-\subsubsection{The density of probabity of existence of enemy estimation 敌人存在性概率密度估计}
+\subsubsection{敌人存在性概率密度估计}
 
-The one of advantage of VB is that it make computation of probability of specific region very easy.
-The probability of exist of enemy in a given region $[x,x+dx]\times[y,y+dy]$ can be given by:
 
 这里采用正态分布族的变分推断的一大好处就是计算特定敌军单位在特定区域的后验概率十分方便。
 从而可以直接计算出出区域中存在任意敌军单位的概率：
@@ -922,7 +716,6 @@ pe(x,y,dx,dy) = 1 - \prod_i (
 )
 \end{align*}
 
-Where $\Phi(x)$ is standard cumulative probability function:
 
 这里$\Phi(x)$是标准正态分布累积分布函数：
 
@@ -930,10 +723,6 @@ $$
 \Phi(x) = \int_{-\infty}^x \frac{1}{\sqrt{2\pi}} \exp\left(\frac{x^2}{2}\right)
 $$
 
-And $\mu^X_i$ is the expect parameter of normal approximated posterior probability of ith enemy.
-The three other are same.
-
-The existence density(approximated) is defined:
 
 而$\mu_{X^E_i}$是第$i$个敌人的近似后验分布的正态期望参数，另外几个类似。
 
@@ -943,9 +732,6 @@ $$
 pe(x,y) = pe(x-\epsilon,y-\epsilon,2\epsilon,2\epsilon)/(4 \epsilon^2)
 $$
 
-Where $\epsilon$ is a small number, in there $\epsilon=0.01$. 
-The two example can be seen in Figure~\ref{fig:existDensity}. 
-The comparing result can be seen in seen in Figure~\ref{fig:bigVbExist}.
 
 其中$\epsilon$是一个足够小的数，在这取$\epsilon=0.01$。两个数量设定的计算的结果
 可见等高线图~\ref{fig:existDensity}。类似上面比较各个数量的结果见图~\ref{fig:bigVbExist}。
@@ -965,23 +751,8 @@ The comparing result can be seen in seen in Figure~\ref{fig:bigVbExist}.
 
 
 
-\section{Extention: Enemy movement detecting 扩展：敌方运动检测}
+\section{扩展：敌方运动侦测}
 
-Considering ally,enemy,battles have not only positions, but also have timestamp. In another word,
-enemy and ally may move in a time range, how do we infer the movement?
-
-Interestingly, the model requires only a bit of modifications to integrate the new specification.
-
-Assurming the time begin at $0$ and end at $1$, and enemy have uniform motion in constant speed.
-So the parameters$x^E_i$ can be rewritten as $x^E_i(t) = (1-t)x^E_i(0) + tx^E_i(1)$, 
-where $x^E_i(0),x^E_i(1)$ means the positions of ith enemy in time 0 and 1 respectively, and so on.
-They are new parameters. The other structual probability function almost keep its original form.
-
-First, assurming $x^E_i(0),y^E_i(0)$ are known and $x^E_i(1),y^E_i(1)$ are unknown.
-A instance of inference is shown in Figure~\ref{fig:bkeu}. 
-Where arrowtail indicate the known begin point.
-The one of two arrowhead surrounded by sd ellipse is estimated $t=1$ coordination expectation. 
-The another one is "true" target point.
 
 考虑友军，敌军，战役不仅有位置信息，还有关于何时在何地的时间信息，即敌友军可以在一个时间段内运动
 并在一些时间发生战斗\footnote{这里发生时间和次数的随机过程化似乎更有必要了，然而为了简化这里两个都是给定的}
@@ -1003,10 +774,6 @@ The another one is "true" target point.
 \label{fig:bkeu}
 \end{figure}
 
-The following Figure~\ref{fig:bueu} show the situation in which $t=0,1$ situation are both unknown
-\footnote{Note they're not in same data set.}. Where the arrowtail of first arrow is "true" begin
-point, the middile point is estimated posterior expect of the point at $t=0$, the arrowhead of second arrow
-is estimated posterior expect of the point at $t=1$.
 
 图~\ref{fig:bueu}显示了当$t=0,1$时敌人的位置都未知时的推断结果\footnote{注意它们没用同一个数据}。
 连续的两个箭头的箭头尾出指向真实初始点，中点表示估计的期初点位置坐标的后验期望，
@@ -1018,27 +785,18 @@ is estimated posterior expect of the point at $t=1$.
 \label{fig:bueu}
 \end{figure}
 
-The prior that give punishment to too long moving range also are useful and easy to implement. 
-But the dataset that can highlight the advantage don't be constructed yet subject to time limit.
-So it will be skiped.
 
 注意这个模型对可能出现的超长运动没有进行先验的惩罚，受制于时间因素，由于算法在这个数据上效果还不错
 就没有专门构造个数据去验证这类先验设定的效果了。
 
-\section{Extention: Dealing complex position distribution. 扩展：处理复杂的复杂的分布形状}
+\section{扩展：处理复杂的复杂的分布形状}
 
-The above contents are based on similar distribution, a curve can divide ally and enemy easily.
-What will happen if the shape become complex and hard to capture for "one center" bayes naive classifer?
 
 上面讨论的基本都基于那个很容易给出一条曲线将两组点分开的数据，
 从而模型中插入的极其简化的朴素贝叶斯分类器都能充分发挥其效能。下面将测试一些其他的形状。
 
-\subsection{Circle 圆形}
+\subsection{圆形}
 
-The "true" position is droped. This section will contain only "initialization value"
-(In above content, "true position" play also initialization value role.). 
-The Figure~\ref{fig:circleIteration} show the circle setting with flat prior, 
-showing also a nice iteration convege process .
 
 这里将友军位置设为圆形的，战役的位置设定成敌军将友军包围所能产生的，但敌军位置本身不给定，
 从而迭代初始值不像之前那样设成真实值而设成随机值。如果这些点可以自动移动到外围的话就可以验证
@@ -1047,23 +805,13 @@ showing also a nice iteration convege process .
 
 \begin{figure}[ht]
 \includegraphics[width=0.99\linewidth]{circle_iteration.png}
-\caption{Iteration process for circle setting with flat prior and random initialization
+\caption{
 均匀先验+圆形设定+随机初始化下的迭代收敛过程}
 \label{fig:circleIteration}
 \end{figure}
 
-\subsection{Case study: The battle of Gettysburg 案例研究：葛底斯堡战役}
+\subsection{案例研究：葛底斯堡战役}
 
-Now, it's the time to abandon the globular chicken in vacuum loved by physicists.
-The Figure~\ref{fig:gettysburg} show the map and corresponding data of the battle of Gettysburg in second day.
-The data only capture the division(NATO:XX) and bridge brigade(NATO:X) in the map.
-\footnote{You may aware the top right corner is not matched well. 
-That is because The data depict state in morning and the map draw the situation in afternoon, the main battle time.
-So it miss the march time the former one may infer.}
-The confederate army have less number of divisions since the size of the divisions of CSA are more big.
-The data is from HPS great wargame "Civil war:Gettysburg". 
-The data used are listed in the Table~\ref{tab:Confederate} and \ref{tab:Union}, in which strength 
-is number of unit that is not used in the model yet and will be used in later section as weight.
 
 本节不再使用前面使用的真空中的球形鸡来验证模型，而直接使用真实战例的数据。图~\ref{fig:gettysburg}
 展示了葛底斯堡战役第二天的战场示意图和单位位置的抽象数据，数据分别标出了旅级单位的分布和师级单位的分布，
@@ -1090,7 +838,7 @@ Early's Div    &      4572 &  6.0 &  3.9 \\
 Johnson's Div  &      6012 &  7.2 &  4.5 \\
 \bottomrule
 \end{tabular}
-\caption{Confederate oob}
+\caption{南方邦联军编制}
 \label{tab:Confederate}
 }
 \hfill
@@ -1120,12 +868,11 @@ Johnson's Div  &      6012 &  7.2 &  4.5 \\
 2nd Div (Howe)      &      3548 &  9.3 &  0.0 \\
 \bottomrule
 \end{tabular}
-\caption{Union oob}
+\caption{联邦军编制}
 \label{tab:Union}
 }
 \end{table}
 
-Following we assurm the position of army of Union and battle are known but CSA not.
 
 下面假定联邦军的位置已知而南方邦联军的位置位置（即南方邦联军等价于前面的敌军）。
 
@@ -1142,8 +889,6 @@ Following we assurm the position of army of Union and battle are known but CSA n
   \label{fig:gettysburg}
 \end{figure}
 
-In Figure~\ref{fig:gettysburgTwo} the forward probability model is illustrated and a sample of the model and observed
-ally unit.
 
 图~\ref{fig:gettysburgTwo}展示了给定两军位置时正向生成模型给出的战役发生概率密度。
 
@@ -1160,40 +905,23 @@ ally unit.
   \label{fig:gettysburgTwo}
 \end{figure}
 
-We can run procedure described above with randomized initialized point. 
-Figure~\ref{fig:gettysburgInit} show the exist-probability and converge process.
 
 这里仍采用随机初始化验证算法有效性，随机初始点设在左上角，若算法正常运行应该收敛到与真实点接近
 的位置上。迭代过程和每个阶段的存在概率密度可见于图~\ref{fig:gettysburgInit}。
 
 \begin{figure}[ht]
 \includegraphics[width=0.99\linewidth]{gettysburg-init.png}
-\caption{Iteration process for randomized initialized setting with flat prior in Gettysburg sample
+\caption{
 均匀先验+随机初始化变分推断在葛底斯堡数据上的迭代过程}
 \label{fig:gettysburgInit}
 \end{figure}
 
-It looks good, thougn the enemy units seems too close to ally. It can be solved a bit by prior.
 
 拟合结果看上去还行，尽管敌军单位比起真实位置有点过于接近友方单位了，这个可以通过加先验惩罚解决。
 
 
-\section{Extention: Size effect 扩展：规模相关模型}
+\section{扩展：考虑规模效应模型}
 
-The above content assurms battles and units are homogeneous. It may make sense,
-but if battle and unit can include number and size information, the result will be more useful.
-
-To extend our model to embrace the change, we can merely define the high weight the unit have,
-the long radius in distance factor and large weight in estimation on center of class unit cause.
-
-Following content use the strength of Table~\ref{tab:Confederate} and \ref{tab:Union} as weight.
-The $\mu,\sigma$ used by naive bayes classifer is computed by weithted version now.
-And the distance will be adujusted to $dist_{ij} = dist_{ij} \frac{\beta}{stre_i}$, the $\beta$
-is seted to $6000$. So all of units of Union will be penalized, 
-and a few of Confederate will be bonused for distance factor.
-
-The Figure~\ref{fig:gettysburgInitTwo} show the result, it very like the result fited without size effect. 
-It turn out that the model is steady for suct effect.
 
 前面的部分都假定战役和单位是同质的。但是上面的葛底斯堡战役例子明显违反了这个假设，
 若能整合单位的规模（战斗力，影响范围）进入模型，拟合结果应该会更好。
@@ -1213,30 +941,13 @@ $dist_{ij} = dist_{ij} \frac{\beta}{stre_i}$，其中参数$\beta$在此设为$6
 
 \begin{figure}[ht]
 \includegraphics[width=0.99\linewidth]{gettysburg-init2.png}
-\caption{Iteration process for randomized initialized setting with flat prior with Size effect
+\caption{
 规模效应+随机初始化+均匀先验的迭代过程}
 \label{fig:gettysburgInitTwo}
 \end{figure}
 
 
-\section{Conclusion 结论}
-
-We present a standard bayes inference framework 
-\footnote{In fact, the content of the paper have been implmented as examples of a open-source library
-hosted in GitHub, see: \url{https://github.com/yiyuezhuo/bayes-torch} where yiyuezhuo is the nickname of
-the writer Yueyi Zhuo} 
-in a classes of prolbem in which 
-two class of point(ally and enemy) will generate another class of points(battle), 
-when one class is hidden(enemy).
-
-The forward model can transformed easily to backward model to do inference due to our framework.
-The inference include point detection, movement dectection with prior or adujusted prior.
-They're be checked its steady and converge performance by true initialization and random initialization.
-A case study about battle of Gettysburg summary the content covered by the paper. 
-I wish the result can be producation environment and my game desigmning.
-
-Desigmning the forward model, doing its inference and balancing effciency and correctness 
-are interesting challenge, but useful.
+\section{结论}
 
 本文作者基于pytorch实现了一个贝叶斯推断框架bayes-torch并用它进行了相关实验推断。
 推断主要包括敌人位置，运动轨迹，存在密度的推断，分别在均匀先验和问题特定先验，真实位置初始化，
@@ -1246,11 +957,9 @@ are interesting challenge, but useful.
 迭代速度过慢，老要钦定参数和分类器不能自适应（Edward的贝叶斯化神经网络看上去效果不错，
 不过怎么看都只会更慢而且难以解释，本文没有使用它）都是一个问题。
 
-\section{Core code implementing the model 实现模型的主要代码}
+%\begin{comment}
 
-This code section contain only the component defining the baseline model and do inference. 
-The full code about figure outputing, parameter tuning and model variants code can be checked in 
-\footnote{\url{https://github.com/yiyuezhuo/Undergraduate-thesis/tree/master/notebook}}.
+\section{实现模型的主要代码}
 
 这里列举的代码仅包括最重要的那些，样板代码和琐碎的绘图与工作函数可见于
 \footnote{\url{https://github.com/yiyuezhuo/Undergraduate-thesis/tree/master/notebook}}。
@@ -1258,7 +967,6 @@ The full code about figure outputing, parameter tuning and model variants code c
 %Anyway, the section is added to deal with foolish paper Duplicate check system, so you would not 
 %expect its completeness since actually the source code is giant.
 
-The top code on baseline model:
 
 基线模型的最顶层定义代码（底层就是那些pytorch代码，忽略）
 
@@ -1305,7 +1013,6 @@ def target2():
 
 \end{python}
 
-The movement detecting model variant:
 
 移动监测模型变体：
 
@@ -1337,7 +1044,6 @@ def target():
 
 \end{python}
 
-The weighted model variant about forward and backward:
 
 加权模型变体：
 
@@ -1416,9 +1122,6 @@ prior_tense = 5.0
 
 \end{python}
 
-There're bayes-torch related code.
-
-Class Model, defining the methods to do point estimation, vb and sampling.
 
 这里列举bayes-torch代码，Model类中包含本文中使用的三种推断算法的实现
 
@@ -1624,7 +1327,6 @@ class Model:
 
 \end{python}
 
-Other helper function in bayes-torch:
 
 最相关的bayes-torch其他函数：
 
@@ -1762,10 +1464,11 @@ plt.show()
 
 \end{python}
 
-
-
 %\begin{python}
 %\end{python}
+
+%\end{comment}
+
 
 \bibliography{paper} 
 \bibliographystyle{ieeetr}
