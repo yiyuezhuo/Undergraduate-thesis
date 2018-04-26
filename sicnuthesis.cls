@@ -4,6 +4,12 @@
 %\RequirePackage{ctex}
 \LoadClass[a4paper,12pt]{ctexart}
 
+\RequirePackage{caption}
+\DeclareCaptionFont{zhten}{\heiti\zihao{5}\selectfont} %caption取黑5字体
+\captionsetup{font = zhten}
+
+
+
 %伪变量声明
 
 \newcommand\sicnu@tokens@title{}

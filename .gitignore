@@ -6,4 +6,6 @@ reference
 *.out
 *.pdf
 *.toc
+*.nav
+*.snm
 draft*
