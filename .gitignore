@@ -8,4 +8,7 @@ reference
 *.toc
 *.nav
 *.snm
+*.pyc
 draft*
+
+images_L/
